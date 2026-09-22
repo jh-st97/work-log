@@ -13,7 +13,10 @@ public enum ErrorCode {
 	PROJECT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 프로젝트에 접근할 권한이 없습니다."),
 	TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 태그입니다."),
 	TAG_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 태그에 접근할 권한이 없습니다."),
-	TAG_DUPLICATED(HttpStatus.CONFLICT, "이미 등록된 태그입니다.");
+	TAG_DUPLICATED(HttpStatus.CONFLICT, "이미 등록된 태그입니다."),
+	WORK_SYSTEM_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 업무 시스템입니다."),
+	WORK_SYSTEM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 업무 시스템에 접근할 권한이 없습니다."),
+	WORK_SYSTEM_DUPLICATED(HttpStatus.CONFLICT, "이미 등록된 업무 시스템입니다.");
 	
 	private final HttpStatus status;
 	private final String message;

@@ -260,11 +260,26 @@ API는 7개 리소스, 32개 엔드포인트로 구성하고, 인증은 Access T
 - DB에 시험용 회원 `test@example.com`(id 1, 비밀번호 `test-password-1234`)이 남아 있음
 - GitHub에 push 완료 (커밋: Initial commit, JWT 로그인 인증 구현 ×2)
 
-### 남은 1단계 작업
-1. CORS 설정(React를 붙일 때, PATCH 메서드 꼭 포함해야 함 — 수정 API가 대부분 PATCH)
+### 1단계 완료
+CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에러 응답 통일, CORS)가 전부 끝났다. `SecurityConfig`에 `.cors(cors -> cors.configurationSource(corsConfigurationSource()))` 추가, `CorsConfigurationSource` Bean에서 `http://localhost:5173`(Vite 기본 포트) 허용, 메서드는 `GET/POST/PATCH/PUT/DELETE`(PATCH 포함 필수), 헤더는 `*`. curl로는 브라우저 CORS 차단을 재현할 수 없어 preflight(OPTIONS + Origin 헤더)를 흉내 내 확인했다. 실제 검증은 React가 생긴 뒤에.
 
-### 다음 단계 (기획서 2단계)
-프로젝트·업무·태그·성과·시스템 CRUD와 화면. 회원가입 때 만든 패턴(엔티티 → Repository → Service → DTO → Controller, 에러는 `ErrorCode` 추가)을 그대로 반복하면 된다.
+### 완료 (2026-09-22, 기획서 2단계 진행 중)
+- `Project` 엔티티(`@ManyToOne Member`, LAZY), `ProjectRepository`(findByMemberIdAndArchivedAtIsNull, findByIdAndMemberId), `ProjectRequest`/`ProjectResponse`(record)
+- `ProjectService`/`ProjectController`: 목록(보관 제외)/등록/상세/수정(더티 체킹, save 호출 안 함)/보관 처리(DELETE가 실제로는 archive) — `findMyProject`로 소유권 확인 공통화(내 것 아니면 403)
+- `Tag` 엔티티(보관 개념 없음, `rename()`만 있음), `TagRepository`(findByMemberId, findByIdAndMemberId, existsByMemberIdAndName, existsByMemberIdAndNameAndIdNot), `TagRequest`/`TagResponse`
+- `TagService`/`TagController`: 목록/등록(이름 중복 409)/수정(자기 자신 제외 중복 확인)/삭제(진짜 DELETE, 보관 아님) — `findByIdAndMemberId`로 소유권까지 한 번에 확인(TAG_ACCESS_DENIED는 정의만 해두고 미사용)
+- `ErrorCode`에 `PROJECT_NOT_FOUND`, `PROJECT_ACCESS_DENIED`, `TAG_NOT_FOUND`, `TAG_ACCESS_DENIED`, `TAG_DUPLICATED` 추가
+- `WorkSystem` 엔티티(Tag와 동일 패턴 + description 필드), `WorkSystemRepository`, `WorkSystemRequest`/`WorkSystemResponse`, `WorkSystemService`/`WorkSystemController` — `GET/POST /api/systems`, `PATCH/DELETE /api/systems/{id}`
+- `ErrorCode`에 `PROJECT_NOT_FOUND`, `PROJECT_ACCESS_DENIED`, `TAG_NOT_FOUND`, `TAG_ACCESS_DENIED`, `TAG_DUPLICATED`, `WORK_SYSTEM_NOT_FOUND`, `WORK_SYSTEM_ACCESS_DENIED`, `WORK_SYSTEM_DUPLICATED` 추가
+- 프로젝트·태그·업무 시스템 CRUD 전부 실제 요청으로 검증 완료(등록/중복/수정/삭제/404/403/400)
+- `project`, `tag`, `work_system` 테이블은 사용자가 SQL로 직접 생성(`UNIQUE` 제약은 별도 인덱스 생성 안 함 — 기획서 규칙)
+- **[중요, 테스트 방법 주의] curl로 한글이 포함된 body를 Windows에서 명령줄 인자(`-d '...'`)로 직접 넘기면 인코딩이 깨져서 요청이 손상되고, 그 결과로 서버가 401(`UNAUTHORIZED`)을 반환한다.** 처음엔 DevTools 재시작이나 원인 불명의 인증 버그로 오해했지만, 실제로는 **테스트 스크립트 문제였고 앱 코드는 처음부터 정상**이었다. 영어(ASCII)만 담긴 body는 항상 성공했고, 한글 body만 실패했다. 확인 방법: JSON body를 UTF-8 파일로 먼저 써 두고(Write 도구 사용) `curl --data-binary "@파일경로"`로 보낸다. **한글이 포함된 요청을 curl로 테스트할 때는 항상 이 파일 방식을 쓴다.**
+- DB에 시험용 데이터가 남아 있음: `member` id 1(test@example.com), `work_system`에 `Payment System`(id 1), `test123`(id 2) 등. 태그·프로젝트도 시험 데이터가 조금 섞여 있을 수 있어 다음 세션에서 필요하면 정리.
+
+### 다음 단계 (기획서 2단계, 남은 것)
+1. **Task(업무)** — Project, Tag, WorkSystem이 모두 준비되어 이제 만들 수 있음. `TaskTag`, `TaskWorkSystem` 중간 엔티티 필요. `task.member_id`가 프로젝트 주인과 일치하는지 서비스에서 검증해야 함(기획서 규칙). 상태 변경(`PATCH /api/tasks/{id}/status`)은 완료로 바꾸면 `completed_at` 기록.
+2. **TaskResult(성과 항목)** — Task 하위.
+3. **DailyLog, TaskLog(일일 기록·진행 메모)** — 기획서 3단계.
 
 ### 정한 것 (기획서에는 없던, 대화 중 결정)
 - 토큰 저장 위치: **localStorage**
@@ -272,8 +287,10 @@ API는 7개 리소스, 32개 엔드포인트로 구성하고, 인증은 Access T
 - 회원가입 비밀번호 검증: 8자 이상 72자 이하 (BCrypt 72바이트 한계 고려)
 - 에러 응답의 `code` 값은 `ErrorCode` enum 이름을 그대로 사용
 - JWT 서명 방식: HS256, `io.jsonwebtoken`(jjwt) 라이브러리 0.12.6
+- CORS 허용 origin: `http://localhost:5173`(React를 다른 포트로 만들면 그때 수정)
+- 엔티티 수정 메서드 이름은 의미에 맞게: `Project.update(...)`(여러 필드), `Tag.rename(...)`(단일 필드), `Project.archive()`(보관 처리 전용)
 
 ### 아직 안 정한 것
 - 이메일 대소문자 구분 여부
-- 태그·시스템·성과 항목·진행 메모 삭제 시 처리 방식
+- 태그·시스템·성과 항목·진행 메모 삭제 시 처리 방식 (Task/TaskTag가 아직 없어서 "이미 연결된 업무가 있을 때" 케이스는 아직 안 생김)
 - 조건 조합 조회 구현 방식(QueryDSL vs Specification vs JPQL)
