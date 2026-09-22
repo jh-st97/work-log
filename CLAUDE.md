@@ -237,35 +237,41 @@ API는 7개 리소스, 32개 엔드포인트로 구성하고, 인증은 Access T
 ## 진행 상황 (이 섹션은 작업하며 계속 갱신)
 
 ### 진행 방식
-- 백엔드 핵심(엔티티, 서비스, Security 설정)은 사용자가 직접 코드를 치고, Claude는 소스와 설명을 먼저 보여준 뒤 사용자가 "다 썼어"라고 하면 파일을 읽고 `./mvnw -q compile`로 컴파일을 확인해 리뷰한다.
+- 백엔드 핵심(엔티티, 서비스, Security 설정)은 사용자가 직접 코드를 치고, Claude는 소스와 설명을 먼저 보여준 뒤 사용자가 "다 썼어"라고 하면 파일을 읽고 `./mvnw -q compile`로 컴파일을 확인해 리뷰한다. (사용자가 직접 "너가 수정해줘"라고 요청하면 그때는 Claude가 Edit/Write로 직접 고친다.)
 - 수정·삭제·추가(새 파일·의존성·설정 포함)는 먼저 무엇을 어떻게 바꿀지 말하고, 사용자가 하라고 해야 실행한다. 읽기·조회는 바로 해도 된다.
-- 앱은 STS(Spring Tools for Eclipse)에서 실행한다. `DB_PASSWORD`는 STS 실행 설정에 있고 시스템 환경변수에는 없다. 콘솔 로그는 STS 안에만 보이므로, 동작 확인은 8080 포트 프로세스 시작 시각과 클래스 컴파일 시각을 비교해 재시작 여부를 먼저 확인한 뒤 요청을 보내는 방식으로 한다.
+- 앱은 STS(Spring Tools for Eclipse)에서 실행한다. `DB_PASSWORD`, `JWT_SECRET`은 STS 실행 설정(Run Configurations → Environment)에 있고 시스템 환경변수에는 없다. 콘솔 로그는 STS 안에만 보이므로, 동작 확인은 8080 포트 프로세스 시작 시각과 클래스 컴파일 시각을 비교해 재시작 여부를 먼저 확인한 뒤 curl로 요청을 보내는 방식으로 한다.
 - Lombok은 쓰지 않는다. DTO는 Java record로 만든다.
-- 패키지는 도메인별로 구성한다(`common`, `config`, `member`, `auth`, 하위 `dto`, `common/exception`).
+- 패키지는 도메인별로 구성한다(`common`, `config`, `member`, `auth`, `security`, 하위 `dto`, `common/exception`).
 - `member` 테이블은 사용자가 SQL로 직접 만들었고, `application.yml`의 `ddl-auto`는 `validate`다(엔티티와 테이블이 맞는지 검사만 하고 자동으로 만들지 않음).
+- 이 프로젝트는 `spring-boot-starter-webmvc`를 쓰는 Spring Boot 4 구성이라 **Jackson(`ObjectMapper`)이 기본 포함되지 않는다.** 필터 단계 등 Jackson이 필요해 보이는 곳에서는 라이브러리를 추가하기보다 간단한 문자열 조립으로 대체했다(예: `JwtAuthenticationEntryPoint`).
+- GitHub 저장소: https://github.com/jh-st97/work-log (Public). STS(EGit)에서 Team → Commit, Team → Push to Upstream(원격 `origin`으로 고정 저장됨)으로 관리한다. 원격 연결 후 최초 1회는 "Push Branch main" 화면에서 URI·계정·토큰을 입력해 `origin`으로 저장해 둬야 다음부터 재입력 없이 push된다.
 
-### 완료 (2026-09-21, 기획서 1단계 일부)
+### 완료 (2026-09-21~22, 기획서 1단계 대부분)
 - `BaseEntity`(id, createdAt, updatedAt + JPA Auditing), `Member` 엔티티, `MemberRepository`(existsByEmail, findByEmail)
 - `SecurityConfig`: signup·login만 permitAll, 나머지는 401, STATELESS, csrf 비활성, BCrypt `PasswordEncoder` Bean
 - 회원가입 API `POST /api/auth/signup`: `SignupRequest`(record, 검증), 이메일 중복 시 409, 응답 `SignupResponse`(id, email, nickname만, 비밀번호 제외)
 - 공통 에러 응답: `ErrorCode`(enum), `BusinessException`, `ErrorResponse`(code, message), `GlobalExceptionHandler`(`@RestControllerAdvice`)
-- 실제 요청으로 201(가입 성공)/409(이메일 중복)/400(검증 실패) 확인 완료
+- JWT 발급·검증: `JwtTokenProvider`(`jjwt` 0.12.6, HS256, `jwt.secret`은 `JWT_SECRET` 환경변수)
+- 로그인 API `POST /api/auth/login`: `LoginRequest`/`LoginResponse`(record), 이메일 없음과 비밀번호 틀림을 구분 없이 401 `LOGIN_FAILED`로 응답(보안 관례)
+- `JwtAuthenticationFilter`(`OncePerRequestFilter` 상속, `Authorization: Bearer` 헤더 해석 후 `SecurityContextHolder`에 회원 번호 등록), `SecurityConfig`에 `addFilterBefore`로 등록
+- `GET /api/members/me`: `@AuthenticationPrincipal Long memberId`로 인증된 회원 조회, 없으면 404 `MEMBER_NOT_FOUND`
+- `JwtAuthenticationEntryPoint`: 미인증(401) 응답도 `{code, message}` JSON 형식으로 통일 (Jackson 없이 문자열 직접 조립)
+- 실제 요청으로 회원가입(201/409/400), 로그인(200/401), 인증 필터(토큰 없음·가짜 토큰 401, 유효한 토큰 200) 전부 확인 완료
 - DB에 시험용 회원 `test@example.com`(id 1, 비밀번호 `test-password-1234`)이 남아 있음
+- GitHub에 push 완료 (커밋: Initial commit, JWT 로그인 인증 구현 ×2)
 
 ### 남은 1단계 작업
-1. JWT 라이브러리 추가(`pom.xml`, jjwt 0.12.6) — 진행 중
-2. JWT 발급·검증 클래스
-3. 로그인 API `POST /api/auth/login`
-4. JWT 필터 등록 및 `SecurityConfig` 수정
-5. `GET /api/members/me`
-6. 토큰 없이 접근했을 때의 401 응답도 `code`/`message` 형식으로 통일
-7. CORS 설정(React를 붙일 때, PATCH 메서드 포함해야 함)
+1. CORS 설정(React를 붙일 때, PATCH 메서드 꼭 포함해야 함 — 수정 API가 대부분 PATCH)
+
+### 다음 단계 (기획서 2단계)
+프로젝트·업무·태그·성과·시스템 CRUD와 화면. 회원가입 때 만든 패턴(엔티티 → Repository → Service → DTO → Controller, 에러는 `ErrorCode` 추가)을 그대로 반복하면 된다.
 
 ### 정한 것 (기획서에는 없던, 대화 중 결정)
 - 토큰 저장 위치: **localStorage**
-- 토큰 만료 시간: **24시간**
+- 토큰 만료 시간: **2시간** (처음엔 24시간으로 정했다가 너무 길다는 판단에 2시간으로 변경)
 - 회원가입 비밀번호 검증: 8자 이상 72자 이하 (BCrypt 72바이트 한계 고려)
 - 에러 응답의 `code` 값은 `ErrorCode` enum 이름을 그대로 사용
+- JWT 서명 방식: HS256, `io.jsonwebtoken`(jjwt) 라이브러리 0.12.6
 
 ### 아직 안 정한 것
 - 이메일 대소문자 구분 여부
