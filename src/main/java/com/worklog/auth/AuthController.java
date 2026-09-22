@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.worklog.member.MemberService;
+import com.worklog.member.dto.LoginRequest;
+import com.worklog.member.dto.LoginResponse;
 import com.worklog.member.dto.SignupRequest;
 import com.worklog.member.dto.SignupResponse;
 
@@ -27,6 +29,12 @@ public class AuthController {
 	public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
 		SignupResponse response = memberService.signup(request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
+	}
+	
+	@PostMapping("/login")
+	public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+		LoginResponse response = memberService.login(request);
+		return ResponseEntity.ok(response);
 	}
 
 }
