@@ -21,6 +21,8 @@ public enum ErrorCode {
 	TASK_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 업무에 접근할 권한이 없습니다."),
 	TASK_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 성과 항목입니다."),
 	DAILY_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 일일 기록입니다."),
+	TASK_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 진행 메모입니다."),
+	TASK_LOG_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 진행 메모에 접근할 권한이 없습니다."),
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 	
 	private final HttpStatus status;
