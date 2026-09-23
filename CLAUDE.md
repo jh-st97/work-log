@@ -275,13 +275,33 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 - `ErrorCode`에 `PROJECT_NOT_FOUND`, `PROJECT_ACCESS_DENIED`, `TAG_NOT_FOUND`, `TAG_ACCESS_DENIED`, `TAG_DUPLICATED`, `WORK_SYSTEM_NOT_FOUND`, `WORK_SYSTEM_ACCESS_DENIED`, `WORK_SYSTEM_DUPLICATED` 추가
 - 프로젝트·태그·업무 시스템 CRUD 전부 실제 요청으로 검증 완료(등록/중복/수정/삭제/404/403/400)
 - `project`, `tag`, `work_system` 테이블은 사용자가 SQL로 직접 생성(`UNIQUE` 제약은 별도 인덱스 생성 안 함 — 기획서 규칙)
-- **[중요, 테스트 방법 주의] curl로 한글이 포함된 body를 Windows에서 명령줄 인자(`-d '...'`)로 직접 넘기면 인코딩이 깨져서 요청이 손상되고, 그 결과로 서버가 401(`UNAUTHORIZED`)을 반환한다.** 처음엔 DevTools 재시작이나 원인 불명의 인증 버그로 오해했지만, 실제로는 **테스트 스크립트 문제였고 앱 코드는 처음부터 정상**이었다. 영어(ASCII)만 담긴 body는 항상 성공했고, 한글 body만 실패했다. 확인 방법: JSON body를 UTF-8 파일로 먼저 써 두고(Write 도구 사용) `curl --data-binary "@파일경로"`로 보낸다. **한글이 포함된 요청을 curl로 테스트할 때는 항상 이 파일 방식을 쓴다.**
+- **[테스트 방법, 2026-09-23 재확인·최종 결론] curl로 한글이 포함된 body를 Windows 명령줄 인자(`-d '...'`)로 직접 넘기면 인코딩이 깨져서 401(`UNAUTHORIZED`)이 난다. 이건 확정된 사실이다.** (9/22에 이 결론을 냈다가, 9/23 초반에 "사실 무작위 현상이었다"고 잘못 정정했었는데, 같은 날 늦게 직접 방식 5회·파일 방식 5회를 같은 내용·같은 토큰으로 바로 이어서 비교하는 통제된 테스트로 **직접 방식 5/5 실패, 파일 방식 5/5 성공**을 확인해서 원래(9/22) 결론이 맞았음을 재확인함. 사이에 있었던 "무작위" 관찰은 여러 테스트를 순서 없이 섞어서 하다가 우연히 ASCII 테스트와 한글 테스트 결과를 같은 원인으로 착각한 것.) **한글이 든 body는 무조건 JSON을 UTF-8 파일로 써서(Write 도구) `curl --data-binary "@파일경로"`로 보낸다. 이게 습관이 아니라 필수다 — 직접 `-d`로 한글 보내는 건 매번 실패한다고 가정할 것.**
+- **[별개 발견, 사소함, 2026-09-23] 존재하지 않는 (메서드+경로) 조합에 요청하면 404/405 대신 401이 나온다** (예: `/api/totally-made-up`, 또는 GET만 있는 `/api/members/me`에 POST). 인증된 상태에서도 그렇다. 원인 미조사. 프론트엔드는 항상 실제 존재하는 엔드포인트만 호출하므로 실사용에는 영향 없음 — 나중에 여유 있을 때 원인을 봐도 되는 낮은 우선순위 항목.
 - DB에 시험용 데이터가 남아 있음: `member` id 1(test@example.com), `work_system`에 `Payment System`(id 1), `test123`(id 2) 등. 태그·프로젝트도 시험 데이터가 조금 섞여 있을 수 있어 다음 세션에서 필요하면 정리.
 
-### 다음 단계 (기획서 2단계, 남은 것)
-1. **Task(업무)** — Project, Tag, WorkSystem이 모두 준비되어 이제 만들 수 있음. `TaskTag`, `TaskWorkSystem` 중간 엔티티 필요. `task.member_id`가 프로젝트 주인과 일치하는지 서비스에서 검증해야 함(기획서 규칙). 상태 변경(`PATCH /api/tasks/{id}/status`)은 완료로 바꾸면 `completed_at` 기록.
-2. **TaskResult(성과 항목)** — Task 하위.
-3. **DailyLog, TaskLog(일일 기록·진행 메모)** — 기획서 3단계.
+### 완료 (2026-09-23, 기획서 2단계 마무리)
+- `Task` 엔티티(`member`, `project` 둘 다 `@ManyToOne` LAZY), `TaskStatus`/`TaskPriority` enum(`@Enumerated(EnumType.STRING)`으로 DB엔 문자열 저장), 상태·우선순위 기본값(TODO/MEDIUM), `update()`(상태 제외 일반 수정), `changeStatus()`(DONE이면 completedAt 기록, 아니면 null로 초기화 — 기획서에 없어 직접 정한 부분), `archive()`
+- `TaskTag`, `TaskWorkSystem` 중간 엔티티(다대다를 푸는 연결 테이블, update 메서드 없음 — 연결은 지우고 다시 만드는 방식)
+- `TaskRepository`(findByMemberIdAndArchivedAtIsNull, findByIdAndMemberId — 상태·우선순위·마감일 등 조건 조합 검색은 아직 안 넣음, 4단계로 미룸), `TaskTagRepository`/`TaskWorkSystemRepository`(findByTaskId, deleteByTaskId)
+- DTO: `TaskRequest`(title, description, priority, dueDate, projectId, tagIds, systemIds), `TaskStatusRequest`(status만), `TaskResponse`(태그·시스템은 `TagResponse`/`WorkSystemResponse` 재사용, projectId만 담고 projectName은 안 담음 — LAZY 추가 조회 피하려고)
+- `TaskService`: 등록/수정 시 프로젝트·태그·업무시스템이 전부 내 것인지 검증(`findMyProject`, `resolveTags`, `resolveWorkSystems`), 수정 시 기존 태그·시스템 연결을 `deleteByTaskId`로 지우고 새로 연결, 조회는 업무마다 태그·시스템을 따로 조회함(N+1 있음, 4단계에서 개선 예정)
+- `TaskController`: `GET/POST /api/tasks`, `GET/PATCH/DELETE /api/tasks/{id}`, `PATCH /api/tasks/{id}/status`
+- `ErrorCode`에 `TASK_NOT_FOUND`, `TASK_ACCESS_DENIED` 추가(Task는 Project와 같은 패턴 — findById 후 소유자 직접 비교해서 403/404 구분)
+- 등록/조회/수정/상태변경(완료↔취소)/보관/검증실패/없는프로젝트·태그로 등록시도/없는업무 조회 전부 실제 요청으로 검증 완료. 프로젝트·태그·업무시스템 기존 기능도 전체 회귀 테스트로 재확인함 — 전부 정상.
+- `task`, `task_tag`, `task_work_system` 테이블은 사용자가 SQL로 직접 생성
+- `LEARNING_NOTES.md` 파일을 프로젝트 루트에 만들어서, 사용자가 헷갈려하는 개념 설명(enum, interface, @ManyToOne, @AuthenticationPrincipal vs @PathVariable, memberId 흐름 등)을 계속 쌓고 있다. 앞으로도 개념 질문이 나오면 설명 후 이 파일에 추가할지 물어볼 것.
+- **사용자가 "주석좀 항상 달아줘"라고 요청함(2026-09-23) — 이후 모든 소스에 한글 주석을 기본으로 넣는다.**
+- `TaskResult` 엔티티(보관 개념 없음, Tag와 같은 방식으로 진짜 삭제), `TaskResultRepository`(findByTaskId, findByIdAndTaskId), `TaskResultRequest`/`TaskResultResponse`
+- `TaskResultService`/`TaskResultController`: 주소가 `/api/tasks/{taskId}/results`로 업무 밑에 걸려 있어서 소유권 확인이 2단계(업무가 내 것인지 → 성과 항목이 진짜 그 업무 것인지). `ErrorCode`에 `TASK_RESULT_NOT_FOUND` 추가
+- 등록(개선 전 값 있음/없음 둘 다)/수정/삭제/없는 업무 밑에서 접근/없는 성과 항목 전부 실제 요청으로 검증 완료
+
+**이걸로 기획서 2단계(프로젝트·업무·태그·성과·시스템)가 전부 끝났다.**
+
+### 다음 단계 (기획서 3단계)
+1. **DailyLog(일일 기록)** — 회원당 하루에 하나(`(member_id, log_date)` UNIQUE), 날짜가 곧 식별자. `GET /api/daily-logs`(기간별 목록), `GET/PUT /api/daily-logs/{date}`(조회·저장, 없으면 생성 있으면 수정 — PUT이라는 점 주의).
+2. **TaskLog(진행 메모)** — DailyLog와 Task 양쪽에 걸리는 구조(`daily_log_id`, `task_id` 둘 다 FK). 유니크 제약 없음(같은 날 같은 업무에 메모 여러 개 가능). `POST /api/daily-logs/{date}/task-logs`, `PATCH/DELETE /api/task-logs/{id}`, `GET /api/tasks/{taskId}/task-logs`.
+3. TaskResult처럼 상위 리소스(DailyLog 또는 Task) 소유권부터 확인하는 패턴을 그대로 반복하면 됨.
+2. **DailyLog, TaskLog(일일 기록·진행 메모)** — 기획서 3단계. TaskResult 끝나면 2단계는 완전히 끝남.
 
 ### 정한 것 (기획서에는 없던, 대화 중 결정)
 - 토큰 저장 위치: **localStorage**
@@ -294,5 +314,6 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 
 ### 아직 안 정한 것
 - 이메일 대소문자 구분 여부
-- 태그·시스템·성과 항목·진행 메모 삭제 시 처리 방식 (Task/TaskTag가 아직 없어서 "이미 연결된 업무가 있을 때" 케이스는 아직 안 생김)
+- **태그·업무 시스템을 삭제할 때, 이미 업무(Task)에 연결되어 있으면 어떻게 할지 — 이제 Task/TaskTag가 생겨서 실제로 발생 가능한 상황이 됐다.** 지금 코드는 아무 검사 없이 그냥 삭제되는데(TagService.deleteTag, WorkSystemService.deleteWorkSystem을 보면 연결 확인이 없음), DB에 FK 제약이 있다면 삭제 자체가 에러 날 수도 있다. 다음에 이 부분을 다룰 때 사용자에게 먼저 물어볼 것(막을지/같이 지울지/그냥 두고 고아 데이터로 남길지).
+- 성과 항목 삭제 시 처리 방식
 - 조건 조합 조회 구현 방식(QueryDSL vs Specification vs JPQL)
