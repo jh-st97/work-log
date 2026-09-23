@@ -89,9 +89,14 @@ public class TaskService {
 		// 더티 체킹으로 기본 정보만 갱신 (상태는 여기서 안 바꿈)
 		task.update(project, request.title(), request.description(), request.priority(), request.dueDate());
 
-		// 태그·업무 시스템 연결은 기존 걸 전부 지우고 요청받은 걸로 새로 만든다
+		// 태그·업무 시스템 연결은 기존 걸 전부 지우고 요청받은 걸로 새로 만든다.
+		// flush()로 삭제를 지금 바로 DB에 반영해야 한다. 안 그러면 Hibernate가
+		// INSERT를 DELETE보다 먼저 실행해버려서, 기존과 같은 태그를 다시 넣을 때
+		// "이미 있는 키" 에러가 난다 (실제로 겪은 버그, 2026-09-23).
 		taskTagRepository.deleteByTaskId(id);
 		taskWorkSystemRepository.deleteByTaskId(id);
+		taskTagRepository.flush();
+		taskWorkSystemRepository.flush();
 
 		List<Tag> tags = resolveTags(request.tagIds(), memberId);
 		List<WorkSystem> systems = resolveWorkSystems(request.systemIds(), memberId);

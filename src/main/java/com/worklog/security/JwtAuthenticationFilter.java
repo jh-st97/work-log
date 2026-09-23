@@ -28,10 +28,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			FilterChain filterChain) throws ServletException, IOException {
 		
 		String token = resolveToken(request);
-		
+
 		if (token != null && jwtTokenProvider.isValid(token)) {
 			Long memberId = jwtTokenProvider.getMemberId(token);
-			
+
 			UsernamePasswordAuthenticationToken authentication =
 					new UsernamePasswordAuthenticationToken(memberId, null, java.util.List.of());
 			SecurityContextHolder.getContext().setAuthentication(authentication);
