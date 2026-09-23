@@ -199,6 +199,7 @@ API는 7개 리소스, 32개 엔드포인트로 구성하고, 인증은 Access T
 | 업무 | PATCH /api/tasks/{id} | 업무 수정 |
 | 업무 | PATCH /api/tasks/{id}/status | 상태 변경(완료로 바꾸면 완료일 기록) |
 | 업무 | DELETE /api/tasks/{id} | 보관 처리 |
+| 성과 항목 | GET /api/tasks/{taskId}/results | 성과 항목 목록 조회(2026-09-23, 기획서 초안엔 없던 것을 화면에서 필요해 추가) |
 | 성과 항목 | POST /api/tasks/{taskId}/results | 성과 항목 추가(지표명, 개선 전, 개선 후) |
 | 성과 항목 | PATCH /api/tasks/{taskId}/results/{resultId} | 성과 항목 수정 |
 | 성과 항목 | DELETE /api/tasks/{taskId}/results/{resultId} | 성과 항목 삭제 |
@@ -295,13 +296,27 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 - `TaskResultService`/`TaskResultController`: 주소가 `/api/tasks/{taskId}/results`로 업무 밑에 걸려 있어서 소유권 확인이 2단계(업무가 내 것인지 → 성과 항목이 진짜 그 업무 것인지). `ErrorCode`에 `TASK_RESULT_NOT_FOUND` 추가
 - 등록(개선 전 값 있음/없음 둘 다)/수정/삭제/없는 업무 밑에서 접근/없는 성과 항목 전부 실제 요청으로 검증 완료
 
-**이걸로 기획서 2단계(프로젝트·업무·태그·성과·시스템)가 전부 끝났다.**
+**이걸로 기획서 2단계 백엔드(프로젝트·업무·태그·성과·시스템)는 전부 끝났다.** (성과 항목 화면은 아직 — 아래 "성과 항목 화면 + 2단계 최종 마무리" 참고)
+
+### 버그 수정 (2026-09-23, Task 수정 시 중복 키 오류)
+- **증상**: 프론트 화면(`TasksPage.tsx`)에서 업무를 수정하면(기존과 같은 태그·시스템을 그대로 유지한 채) `PATCH /api/tasks/{id}`가 401로 실패. curl로도 재현되고 앱을 재시작해도 계속 발생.
+- **진짜 원인**: `TaskService.updateTask`가 태그·업무 시스템 연결을 "전부 삭제 후 새로 생성"하는 방식인데, Hibernate는 같은 트랜잭션 안에서 **INSERT를 DELETE보다 먼저** 실행한다(자바 코드에 적은 순서와 무관). 그래서 기존과 동일한 태그를 다시 연결하면 삭제가 반영되기 전에 같은 `(task_id, tag_id)`로 INSERT가 먼저 들어가 `task_tag_task_id_tag_id_key` 유니크 제약 위반이 났다. 콘솔 에러는 500(또는 그 여파로 401)으로 보였음.
+- **수정**: `deleteByTaskId(id)` 호출 직후 `taskTagRepository.flush()` / `taskWorkSystemRepository.flush()`를 추가해서 삭제를 즉시 DB에 반영한 뒤 INSERT가 일어나게 함. [TaskService.java](src/main/java/com/worklog/task/TaskService.java)의 `updateTask` 메서드.
+- **디버깅 중 별개로 드러난 것**: 위 수정 후에도 같은 curl 재현 시나리오가 401로 남아있었는데, 원인을 추적하려고 `JwtTokenProvider`/`JwtAuthenticationFilter`에 임시 디버그 로그를 넣어 확인한 결과 **Claude가 디버그 curl을 만들면서 한글(`"디버그 테스트"`)을 파일 없이 `-d`로 직접 보낸 것**이 원인이었다. 즉 278번 줄에 이미 적혀있던 "한글은 항상 파일로" 규칙을 Claude 스스로 어겨서 생긴, 새로운 버그가 아닌 반복 실수였다. UTF-8 파일 + `--data-binary`로 동일 시나리오를 10회 재시도해 10/10 성공(200)으로 확정. 임시 디버그 로그는 원인 확인 후 제거함.
+- 커밋: `fix: Task 수정 시 태그·시스템 재연결 중복 키 오류 수정` (5b92771), push 완료.
+
+### 완료 (2026-09-23, 성과 항목 화면 + 2단계 최종 마무리)
+- 프론트엔드 `TasksPage.tsx`에 성과 항목(지표명·개선 전·개선 후) 목록·추가·수정·삭제 UI를 업무 수정 폼 안에 붙였다(수정 모드일 때만 노출 — 성과 항목은 이미 존재하는 업무에만 붙일 수 있어서).
+- 화면에서 목록을 보여주려면 성과 항목 조회 API가 있어야 하는데 기획서 API 목록엔 없어서, `GET /api/tasks/{taskId}/results`를 새로 추가했다(`TaskResultRepository.findByTaskId`는 이미 있어서 Service·Controller에 얇게 얹기만 함). 위 API 목록 표에도 반영함.
+- 등록/수정/삭제를 실제 브라우저에서 전부 확인. 삭제 확인창(`window.confirm`)은 Claude의 자동화 브라우저에서는 네이티브 다이얼로그라 직접 클릭으로 못 눌러서 `window.confirm`을 임시로 덮어써서 우회 확인함 — 실제 사용자 브라우저에서는 정상적으로 뜬다.
+- `TaskResultController`/`TaskResultService`는 아직 커밋 전(다음에 커밋 예정).
+
+**이걸로 기획서 2단계(프로젝트·업무·태그·성과·시스템)가 백엔드·화면 전부 완전히 끝났다.**
 
 ### 다음 단계 (기획서 3단계)
 1. **DailyLog(일일 기록)** — 회원당 하루에 하나(`(member_id, log_date)` UNIQUE), 날짜가 곧 식별자. `GET /api/daily-logs`(기간별 목록), `GET/PUT /api/daily-logs/{date}`(조회·저장, 없으면 생성 있으면 수정 — PUT이라는 점 주의).
 2. **TaskLog(진행 메모)** — DailyLog와 Task 양쪽에 걸리는 구조(`daily_log_id`, `task_id` 둘 다 FK). 유니크 제약 없음(같은 날 같은 업무에 메모 여러 개 가능). `POST /api/daily-logs/{date}/task-logs`, `PATCH/DELETE /api/task-logs/{id}`, `GET /api/tasks/{taskId}/task-logs`.
 3. TaskResult처럼 상위 리소스(DailyLog 또는 Task) 소유권부터 확인하는 패턴을 그대로 반복하면 됨.
-2. **DailyLog, TaskLog(일일 기록·진행 메모)** — 기획서 3단계. TaskResult 끝나면 2단계는 완전히 끝남.
 
 ### 정한 것 (기획서에는 없던, 대화 중 결정)
 - 토큰 저장 위치: **localStorage**

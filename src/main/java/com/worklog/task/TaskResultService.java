@@ -1,5 +1,7 @@
 package com.worklog.task;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,15 @@ public class TaskResultService {
 	public TaskResultService(TaskResultRepository taskResultRepository, TaskRepository taskRepository) {
 		this.taskResultRepository = taskResultRepository;
 		this.taskRepository = taskRepository;
+	}
+
+	// 이 업무에 달린 성과 항목 전체 조회 (수정·삭제와 달리 목록이라 findMyTask만 확인하면 됨)
+	public List<TaskResultResponse> getResults(Long taskId, Long memberId) {
+		findMyTask(taskId, memberId);
+
+		return taskResultRepository.findByTaskId(taskId).stream()
+				.map(TaskResultResponse::from)
+				.toList();
 	}
 
 	@Transactional
