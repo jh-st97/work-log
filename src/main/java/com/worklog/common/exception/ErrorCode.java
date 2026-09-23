@@ -19,7 +19,9 @@ public enum ErrorCode {
 	WORK_SYSTEM_DUPLICATED(HttpStatus.CONFLICT, "이미 등록된 업무 시스템입니다."),
 	TASK_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 업무입니다."),
 	TASK_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 업무에 접근할 권한이 없습니다."),
-	TASK_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 성과 항목입니다.");
+	TASK_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 성과 항목입니다."),
+	DAILY_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 일일 기록입니다."),
+	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 	
 	private final HttpStatus status;
 	private final String message;

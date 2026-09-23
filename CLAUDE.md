@@ -313,10 +313,21 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 
 **이걸로 기획서 2단계(프로젝트·업무·태그·성과·시스템)가 백엔드·화면 전부 완전히 끝났다.**
 
-### 다음 단계 (기획서 3단계)
-1. **DailyLog(일일 기록)** — 회원당 하루에 하나(`(member_id, log_date)` UNIQUE), 날짜가 곧 식별자. `GET /api/daily-logs`(기간별 목록), `GET/PUT /api/daily-logs/{date}`(조회·저장, 없으면 생성 있으면 수정 — PUT이라는 점 주의).
-2. **TaskLog(진행 메모)** — DailyLog와 Task 양쪽에 걸리는 구조(`daily_log_id`, `task_id` 둘 다 FK). 유니크 제약 없음(같은 날 같은 업무에 메모 여러 개 가능). `POST /api/daily-logs/{date}/task-logs`, `PATCH/DELETE /api/task-logs/{id}`, `GET /api/tasks/{taskId}/task-logs`.
-3. TaskResult처럼 상위 리소스(DailyLog 또는 Task) 소유권부터 확인하는 패턴을 그대로 반복하면 됨.
+### 완료 (2026-09-23, 기획서 3단계 시작 — DailyLog)
+- `DailyLog` 엔티티(`member` `@ManyToOne` LAZY, `logDate`, `summary` — Tag처럼 보관 개념 없음), `updateSummary()`만 있는 단일 필드 수정 패턴. 엔티티는 사용자가 직접 타이핑.
+- `DailyLogRepository`: `findByMemberIdAndLogDate`(단일 날짜 조회 — GET 상세, PUT 저장 둘 다 여기서 씀), `findByMemberIdAndLogDateBetween`(기간 목록, `Pageable` 사용)
+- DTO: `DailyLogRequest`(summary만, NULL 허용이라 검증 없음), `DailyLogResponse`(TaskLog는 다음 단계에서 붙을 예정이라 아직 없음)
+- `DailyLogService`/`DailyLogController`: `GET /api/daily-logs`(기간+페이징, `Pageable`을 이번에 처음 도입 — 기획서 4단계로 미루지 않고 바로 넣음, `@PageableDefault(size=20, sort="logDate", direction=DESC)`), `GET /api/daily-logs/{date}`(없으면 404), `PUT /api/daily-logs/{date}`(upsert — 있으면 수정, 없으면 새로 만듦, `findMyDailyLog(...).map(...).orElseGet(...)` 패턴). `ErrorCode`에 `DAILY_LOG_NOT_FOUND` 추가(접근 권한 에러는 안 둠 — memberId로 스코프된 조회라 남의 것에 우연히 접근할 방법이 없어서).
+- `daily_log` 테이블은 사용자가 SQL로 직접 생성(`(member_id, log_date)` UNIQUE).
+- **버그 발견·수정: `DailyLog.getMemberId()` 편의 메서드가 Spring Data 쿼리 생성을 망가뜨림.** `findByMemberIdAndLogDate`처럼 "MemberId"가 들어간 메서드명은 원래 Spring Data가 `member`(연관관계 필드) + `.id`로 쪼개서 이해해야 하는데, 엔티티에 `getMemberId()`(제가 만든 편의 메서드, `member.getId()`를 그냥 리턴)가 있으니 Spring Data가 이걸 진짜 필드처럼 착각해서 `d.memberId`라는 존재하지 않는 JPQL 경로를 그대로 만들어버렸다. 결과: 요청 시점에 `BadJpqlGrammarException` 발생 → 아래 서술할 이유로 클라이언트에는 엉뚱하게 401로 보임 → "왜 만든 지 얼마 안 된 엔드포인트가 다 401이지?"로 한참 헤맴. 다른 엔티티(Project/Task/Tag/WorkSystem)는 이런 `getXxxId()` 단축 메서드가 없어서 문제가 없었음. **교훈: 연관관계 필드가 있는 엔티티에 `getXxxId()` 같은 편의 메서드를 만들지 말 것** — Spring Data 쿼리 메서드 이름과 충돌한다. `getMemberId()` 삭제로 해결.
+- **버그 발견·수정: 처리 안 된 예외가 401로 보이는 문제.** `GlobalExceptionHandler`가 원래 `BusinessException`과 `MethodArgumentNotValidException`만 잡고 있어서, 그 외의 예외(위 JPQL 오류, 필수 `@RequestParam` 누락 등)가 이 앱의 Security 설정 특성상 클라이언트에는 401(`인증이 필요합니다`)로 보였다 — 9/23 하루 종일 쫓아다닌 "원인 불명 401"들의 상당수가 사실 이거였음. `MissingServletRequestParameterException`을 400으로 따로 잡고(`GET /api/daily-logs`에서 `from`/`to` 빠뜨리면 이제 정확히 400), 나머지 전부를 잡는 `@ExceptionHandler(Exception.class)`로 500을 반환하도록 추가함(`ErrorCode.INTERNAL_SERVER_ERROR` 추가). 이후 "존재하지 않는 경로" 요청도 401 대신 500으로 바뀜 — 여전히 정확한 404는 아니지만 최소한 "인증 필요"라는 거짓 메시지는 안 뜸. **404까지 정확하게 만드는 건 보류함**(`spring.mvc.throw-exception-if-no-handler-found` 설정 + `NoHandlerFoundException` 처리 필요, 사소해서 나중으로 미룸).
+- 생성/조회/없는 날짜(404)/기간 목록(페이징)/수정(upsert, 같은 id 유지)/파라미터 누락(400)/토큰 없음(401) 전부 실제 요청으로 검증 완료.
+- 아직 커밋 전.
+
+### 다음 단계 (기획서 3단계, 남은 것)
+1. **TaskLog(진행 메모)** — DailyLog와 Task 양쪽에 걸리는 구조(`daily_log_id`, `task_id` 둘 다 FK). 유니크 제약 없음(같은 날 같은 업무에 메모 여러 개 가능). `POST /api/daily-logs/{date}/task-logs`, `PATCH/DELETE /api/task-logs/{id}`, `GET /api/tasks/{taskId}/task-logs`. **주의: 여기에도 연관관계 필드(`dailyLog`, `task`)가 있을 텐데, `getMemberId()` 같은 편의 메서드를 만들지 말 것 — 위에서 겪은 버그와 같은 원인이 될 수 있음.**
+2. TaskResult처럼 상위 리소스(DailyLog 또는 Task) 소유권부터 확인하는 패턴을 그대로 반복하면 됨.
+3. `DailyLogResponse`에 TaskLog 목록을 담을지, 아니면 TaskResult처럼 별도 엔드포인트로 조회할지는 TaskLog 만들 때 결정.
 
 ### 정한 것 (기획서에는 없던, 대화 중 결정)
 - 토큰 저장 위치: **localStorage**
