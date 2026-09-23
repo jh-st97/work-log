@@ -245,6 +245,8 @@ API는 7개 리소스, 32개 엔드포인트로 구성하고, 인증은 Access T
 - `member` 테이블은 사용자가 SQL로 직접 만들었고, `application.yml`의 `ddl-auto`는 `validate`다(엔티티와 테이블이 맞는지 검사만 하고 자동으로 만들지 않음).
 - 이 프로젝트는 `spring-boot-starter-webmvc`를 쓰는 Spring Boot 4 구성이라 **Jackson(`ObjectMapper`)이 기본 포함되지 않는다.** 필터 단계 등 Jackson이 필요해 보이는 곳에서는 라이브러리를 추가하기보다 간단한 문자열 조립으로 대체했다(예: `JwtAuthenticationEntryPoint`).
 - GitHub 저장소: https://github.com/jh-st97/work-log (Public). STS(EGit)에서 Team → Commit, Team → Push to Upstream(원격 `origin`으로 고정 저장됨)으로 관리한다. 원격 연결 후 최초 1회는 "Push Branch main" 화면에서 URI·계정·토큰을 입력해 `origin`으로 저장해 둬야 다음부터 재입력 없이 push된다.
+- **저장소 이름을 `work-log`에서 `work-log-backend`로 바꿀 예정(2026-09-22 결정, 아직 실행 안 함).** 바꾸면 이 문서의 주소와 로컬 STS의 원격 URL도 같이 고쳐야 한다.
+- 프론트엔드 프로젝트가 별도로 생겼다: `C:\workspace\side-projects\work-log\work-log-frontend` (React + TypeScript + Vite). 자세한 내용은 그 프로젝트의 CLAUDE.md 참고. GitHub: https://github.com/jh-st97/work-log-frontend
 
 ### 완료 (2026-09-21~22, 기획서 1단계 대부분)
 - `BaseEntity`(id, createdAt, updatedAt + JPA Auditing), `Member` 엔티티, `MemberRepository`(existsByEmail, findByEmail)
