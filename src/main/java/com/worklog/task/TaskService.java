@@ -1,7 +1,13 @@
 package com.worklog.task;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,13 +51,25 @@ public class TaskService {
 		this.workSystemRepository = workSystemRepository;
 	}
 
-	// 내 업무 목록 (보관 제외). 태그·시스템까지 업무마다 따로 조회한다 —
-	// 업무가 많아지면 요청이 여러 번 나가는 비효율(N+1)이 있는데, 이건 나중에(4단계) 개선한다.
-	public List<TaskResponse> getTasks(Long memberId) {
-		return taskRepository.findByMemberIdAndArchivedAtIsNull(memberId)
-				.stream()
-				.map(task -> TaskResponse.of(task, getTagResponses(task.getId()), getWorkSystemResponses(task.getId())))
-				.toList();
+	// 내 업무 목록. 상태·우선순위·프로젝트·시스템·태그·마감일 범위·키워드를 조합해서 걸러내고, 페이징한다.
+	// null인 필터는 TaskSpecification에서 건너뛴다 — 아무 필터도 안 주면 "보관 안 된 내 업무 전체"가 된다.
+	public Page<TaskResponse> getTasks(Long memberId, TaskStatus status, TaskPriority priority, Long projectId,
+			Long systemId, Long tagId, LocalDate dueDateFrom, LocalDate dueDateTo, String keyword,
+			Pageable pageable) {
+		Specification<Task> spec = TaskSpecification.search(memberId, status, priority, projectId, systemId, tagId,
+				dueDateFrom, dueDateTo, keyword);
+
+		Page<Task> tasks = taskRepository.findAll(spec, pageable);
+
+		// 이번 페이지에 나온 업무들의 태그·시스템을 한 번에 모아서 가져온 다음(각 1번씩만 조회),
+		// 업무 번호로 묶어(groupingBy) 메모리에서 매칭한다 — 업무마다 따로 조회하지 않아도 됨(N+1 개선).
+		List<Long> taskIds = tasks.getContent().stream().map(Task::getId).toList();
+		Map<Long, List<TagResponse>> tagsByTaskId = groupTagsByTaskId(taskIds);
+		Map<Long, List<WorkSystemResponse>> systemsByTaskId = groupWorkSystemsByTaskId(taskIds);
+
+		return tasks.map(task -> TaskResponse.of(task,
+				tagsByTaskId.getOrDefault(task.getId(), List.of()),
+				systemsByTaskId.getOrDefault(task.getId(), List.of())));
 	}
 
 	public TaskResponse getTask(Long id, Long memberId) {
@@ -184,6 +202,30 @@ public class TaskService {
 		return taskWorkSystemRepository.findByTaskId(taskId).stream()
 				.map(taskWorkSystem -> WorkSystemResponse.from(taskWorkSystem.getWorkSystem()))
 				.toList();
+	}
+
+	// taskIds가 비어 있으면 쿼리를 아예 안 날린다 (빈 목록 조회 시 불필요한 SQL 방지)
+	private Map<Long, List<TagResponse>> groupTagsByTaskId(List<Long> taskIds) {
+		if (taskIds.isEmpty()) {
+			return Map.of();
+		}
+
+		return taskTagRepository.findByTaskIdIn(taskIds).stream()
+				.collect(Collectors.groupingBy(
+						taskTag -> taskTag.getTask().getId(),
+						Collectors.mapping(taskTag -> TagResponse.from(taskTag.getTag()), Collectors.toList())));
+	}
+
+	private Map<Long, List<WorkSystemResponse>> groupWorkSystemsByTaskId(List<Long> taskIds) {
+		if (taskIds.isEmpty()) {
+			return Map.of();
+		}
+
+		return taskWorkSystemRepository.findByTaskIdIn(taskIds).stream()
+				.collect(Collectors.groupingBy(
+						taskWorkSystem -> taskWorkSystem.getTask().getId(),
+						Collectors.mapping(taskWorkSystem -> WorkSystemResponse.from(taskWorkSystem.getWorkSystem()),
+								Collectors.toList())));
 	}
 
 }

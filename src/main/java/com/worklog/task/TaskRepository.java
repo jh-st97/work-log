@@ -1,15 +1,14 @@
 package com.worklog.task;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface TaskRepository extends JpaRepository<Task, Long>{
-	
-	// 내 업무 중 보관 안 된 것만
-	List<Task> findByMemberIdAndArchivedAtIsNull(Long memberId);
-	
+// JpaSpecificationExecutor를 추가하면 findAll(Specification, Pageable)처럼
+// 동적 조건 + 페이징을 조합한 조회 메서드들이 딸려온다 (업무 목록 필터링에 사용).
+public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificationExecutor<Task> {
+
 	// 업무 번호 + 회원 번호로 소유권까지 같이 확인
 	Optional<Task> findByIdAndMemberId(Long id, Long memberId);
 

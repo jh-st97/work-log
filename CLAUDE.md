@@ -337,8 +337,19 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 
 **이걸로 기획서 3단계(DailyLog, TaskLog)가 백엔드·화면 전부 완전히 끝났다.** 프론트엔드 하루 일지 화면(`DailyLogPage`)은 `work-log-frontend`의 CLAUDE.md에 자세히 기록.
 
-### 다음 단계 (기획서 4단계)
-날짜별·업무별·상태별·시스템별 조회 개선, 페이징(업무 목록 등 아직 페이징 없는 곳), N+1 개선(Task의 태그·업무시스템을 업무마다 따로 조회하는 부분). 조건 조합 조회 구현 방식(QueryDSL vs Specification vs JPQL)도 이때 정함.
+### 완료 (2026-09-27, 기획서 4단계 — 업무 목록 필터·페이징·N+1 개선)
+- **조건 조합 조회 구현 방식: Specification으로 결정**(QueryDSL은 빌드 설정이 복잡하고 JPQL 직접 조립은 "일부 필터만 있을 때" 처리가 지저분해져서 제외). spring-data-jpa에 이미 포함돼 있어 새 의존성 없음.
+- `TaskSpecification`(새 파일): 상태·우선순위·프로젝트·마감일 범위·키워드(제목/설명, 대소문자 무시)는 Task 필드에 바로 조건을 걸고, 항상 `member_id`와 `archivedAt IS NULL`을 적용. **태그·업무시스템은 Task가 직접 모르는 관계(단방향 설계)라 서브쿼리**(`task.id IN (SELECT tt.task.id FROM TaskTag tt WHERE tt.tag.id = ?)`)로 걸러냄. 파라미터가 null이면 그 조건은 건너뜀.
+- `TaskRepository`에 `JpaSpecificationExecutor<Task>` 추가, 안 쓰게 된 `findByMemberIdAndArchivedAtIsNull`은 삭제.
+- `GET /api/tasks`가 `List`가 아니라 `Page<TaskResponse>`를 반환하고, 쿼리 파라미터 `status`, `priority`, `projectId`, `systemId`, `tagId`, `dueDateFrom`, `dueDateTo`, `keyword` + `page`/`size`/`sort`를 받음(기본 `size=20`, `createdAt` 내림차순).
+- **N+1 개선**: 목록 조회 시 업무마다 태그·시스템을 따로 조회하던 걸, 이번 페이지 업무 id들로 `findByTaskIdIn`을 한 번씩만 호출(`TaskTagRepository`, `TaskWorkSystemRepository`에 추가)하고 `Collectors.groupingBy`로 메모리에서 매칭. 업무 단건 조회(`getTask`)·상태 변경은 업무 1개라 기존 방식 유지. 빈 id 목록이면 쿼리를 아예 안 날림.
+- 필터 각각·조합(AND)·페이징(`size=1`)·키워드(영문·한글)·없는 태그(빈 목록) 전부 실제 요청으로 검증 완료. 한글 키워드는 URL 퍼센트 인코딩(`%EB%94%94...`)으로 보내면 Git Bash 인코딩 문제를 피할 수 있음.
+- 프론트엔드 필터 UI·페이지 이동은 `work-log-frontend`의 CLAUDE.md 참고.
+
+### 다음 단계
+- 기획서 5단계: 테스트 코드, Swagger 정리, README
+- 미뤄둔 것들: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기(`NoHandlerFoundException`), `LEARNING_NOTES.md` 커밋, 프로젝트·태그·시스템 목록 페이징(지금은 전체 반환), 저장소 이름 `work-log-backend`로 변경
+- [도구 참고] 이 세션의 Claude 브라우저는 작업 디렉터리가 백엔드라 `preview_start`의 `launch.json`이 프론트엔드를 못 띄움 → Bash `run_in_background`로 `npm run dev`를 띄우고 `navigate`로 접속하는 방식을 씀. 사용자가 따로 `npm run dev`를 켜 두면 5174로 밀려 CORS 에러가 나니 포트 겹침 먼저 확인.
 
 ### 정한 것 (기획서에는 없던, 대화 중 결정)
 - 토큰 저장 위치: **localStorage**

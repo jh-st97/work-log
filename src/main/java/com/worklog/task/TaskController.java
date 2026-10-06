@@ -1,7 +1,11 @@
 package com.worklog.task;
 
-import java.util.List;
+import java.time.LocalDate;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -12,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.worklog.task.dto.TaskRequest;
@@ -30,10 +35,21 @@ public class TaskController {
 		this.taskService = taskService;
 	}
 
-	// GET /api/tasks : 내 업무 목록
+	// GET /api/tasks : 내 업무 목록 (필터, 페이징, 정렬)
+	// 필터는 전부 선택 사항이다 — 아무것도 안 주면 보관 안 된 내 업무 전체를 최신순으로 보여준다.
 	@GetMapping
-	public List<TaskResponse> getTasks(@AuthenticationPrincipal Long memberId) {
-		return taskService.getTasks(memberId);
+	public Page<TaskResponse> getTasks(@AuthenticationPrincipal Long memberId,
+			@RequestParam(required = false) TaskStatus status,
+			@RequestParam(required = false) TaskPriority priority,
+			@RequestParam(required = false) Long projectId,
+			@RequestParam(required = false) Long systemId,
+			@RequestParam(required = false) Long tagId,
+			@RequestParam(required = false) LocalDate dueDateFrom,
+			@RequestParam(required = false) LocalDate dueDateTo,
+			@RequestParam(required = false) String keyword,
+			@PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+		return taskService.getTasks(memberId, status, priority, projectId, systemId, tagId, dueDateFrom, dueDateTo,
+				keyword, pageable);
 	}
 
 	// GET /api/tasks/{id} : 업무 상세

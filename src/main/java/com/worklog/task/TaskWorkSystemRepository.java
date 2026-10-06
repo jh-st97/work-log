@@ -9,6 +9,9 @@ public interface TaskWorkSystemRepository extends JpaRepository<TaskWorkSystem, 
 	// 이 업무에 연결된 업무 시스템 목록 조회
 	List<TaskWorkSystem> findByTaskId(Long taskId);
 
+	// 업무 목록 조회용 — 여러 업무의 업무 시스템을 한 번에 가져온다 (N+1 방지)
+	List<TaskWorkSystem> findByTaskIdIn(List<Long> taskIds);
+
 	// 업무 수정 시 업무 시스템을 통째로 다시 붙이기 위해, 기존 연결을 전부 지운다
 	void deleteByTaskId(Long taskId);
 
