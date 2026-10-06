@@ -23,7 +23,8 @@
 
 - 상태: 예정 / 진행 / 완료
 - 우선순위, 마감일
-- 삭제 대신 보관 처리
+- 삭제 대신 보관 처리 (보관함에서 복구 가능)
+- 프로젝트를 보관하면 그 안의 업무도 목록에서 함께 숨김
 
 **기술 태그 · 업무 시스템**
 
@@ -183,11 +184,12 @@ H2 같은 메모리 DB 대신 실제 PostgreSQL을 쓴 이유는 다음과 같�
 
 **프로젝트**
 
-- `GET /api/projects` 목록
+- `GET /api/projects` 목록 (`archived=true`면 보관함)
 - `POST /api/projects` 등록
 - `GET /api/projects/{id}` 상세
 - `PATCH /api/projects/{id}` 수정
 - `DELETE /api/projects/{id}` 보관 처리
+- `POST /api/projects/{id}/restore` 보관 복구
 
 **태그**
 
@@ -205,12 +207,13 @@ H2 같은 메모리 DB 대신 실제 PostgreSQL을 쓴 이유는 다음과 같�
 
 **업무**
 
-- `GET /api/tasks` 목록 (필터, 페이징, 정렬)
+- `GET /api/tasks` 목록 (필터, 페이징, 정렬, `archived=true`면 보관함)
 - `POST /api/tasks` 등록
 - `GET /api/tasks/{id}` 상세
 - `PATCH /api/tasks/{id}` 수정
 - `PATCH /api/tasks/{id}/status` 상태 변경
 - `DELETE /api/tasks/{id}` 보관 처리
+- `POST /api/tasks/{id}/restore` 보관 복구 (프로젝트가 보관 중이면 409)
 
 **성과 항목**
 
@@ -288,5 +291,6 @@ QueryDSL은 빌드 설정이 무겁고, 문자열 JPQL 조립은 조건이 늘�
 ## 앞으로 할 일
 
 - Refresh Token (현재는 만료되면 다시 로그인)
-- 보관한 업무·프로젝트 복구, 알림
+- 보관함에서 영구 삭제
+- 알림(저녁 기록, 마감일)
 - Docker, GitHub Actions

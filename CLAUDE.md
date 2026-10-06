@@ -415,6 +415,18 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 - **프론트는 화면 코드를 안 바꿨음**: `getProjects/getTags/getWorkSystems`가 `?size=1000`으로 받아 `content`만 돌려줌(업무 화면 드롭다운·체크박스에 전체가 필요해서). 한 종류가 1000개를 넘으면 잘리는 한계가 있으나 개인용이라 허용. 사용자에게 "페이징 효과가 작다"고 설명했지만 원칙대로 하기로 함.
 - 전체 테스트 통과 + 서버 재시작 후 네 화면(프로젝트·태그·업무 시스템·업무)이 정상으로 뜨는 것 확인.
 
+### 완료 (2026-10-06, 보관 항목 복구 — 기획서 "이후" 기능)
+- **결정(사용자)**: 보관 중인 프로젝트에 속한 업무는 복구를 **막고 안내**(409 `PROJECT_ARCHIVED`, "프로젝트를 먼저 복구해 주세요"), 화면은 각 화면에 **"보관함 보기" 토글**(전용 화면 아님).
+- API: `GET /api/tasks?archived=true`, `GET /api/projects?archived=true`(보관함, 기본 false), `POST /api/tasks/{id}/restore`, `POST /api/projects/{id}/restore`. `Task.restore()`, `Project.restore()`는 `archivedAt = null`. `ProjectRepository.findByMemberIdAndArchivedAtIsNotNull` 추가. `TaskSpecification.search`에 `archived` 인자 추가(`TaskService.getTasks`도 인자 추가).
+- **기획서 규칙 구현 누락을 발견·수정**: "프로젝트를 보관하면 하위 업무도 목록에서 함께 숨긴다"가 지금까지 안 지켜지고 있었음(업무 목록이 업무 자신의 `archivedAt`만 봄). 보통 목록은 이제 `task.archivedAt IS NULL AND project.archivedAt IS NULL`. 업무 보관함(`archived=true`)은 **직접 보관한 업무만** 보여줌(프로젝트 때문에 숨겨진 업무는 안 나옴). 보관 중인 프로젝트에 업무를 새로 만들거나 옮겨 넣는 것도 `PROJECT_ARCHIVED`로 막음(`TaskService.findMyProject`).
+- **프로젝트 복구는 하위 업무의 보관 상태를 건드리지 않음**: 프로젝트 보관 때문에 숨겨졌던 업무는 프로젝트만 되살려도 다시 보이고, 직접 보관해 둔 업무는 보관함에 그대로 남는다.
+- 테스트: `ArchiveRestoreServiceTest`(7), `ArchiveRestoreControllerTest`(4) + `TaskServiceTest` 호출부 수정. 전체 통과. 프론트까지 실제 브라우저로 보관→보관함→복구, 프로젝트 보관 중 업무 복구 차단 메시지, 프로젝트 복구까지 확인.
+- [도구 참고] `./mvnw -q test-compile`이 메서드 시그니처가 바뀐 뒤에도 에러 없이 끝난 적이 있음(증분 컴파일이 테스트를 다시 안 컴파일). 호출부를 직접 확인하거나 테스트 파일을 `touch`해서 다시 컴파일시킬 것. Vite 개발 서버가 또 수정을 놓쳐서(`curl`로 `?t=` 없이 받은 결과가 낡음) 껐다 켬.
+
+### 다음 할 일 (사용자 요청, 2026-10-06)
+- **보관함에서 영구 삭제**(물리 삭제)를 만들 것. 정할 것: 업무를 지우면 딸린 성과 항목·진행 메모·태그/시스템 연결도 같이 지워야 함(FK). 프로젝트를 영구 삭제할 때 그 안의 업무까지 전부 지울지 vs 업무가 남아 있으면 막을지 사용자에게 물어볼 것. 영구 삭제는 되돌릴 수 없으니 확인창을 보관 때보다 강하게.
+- 지금 DB에 쌓인 시험 데이터(보관함의 `pagination test 0~18`, `archive-test-*`, `diag test edit2`, `디버그 테스트` 등)는 영구 삭제 기능이 생기면 화면에서 정리할 예정.
+
 ### 다음 단계
 - 기획서 1~5단계 완료. 남은 것은 아래 "미뤄둔 것"과 기획서의 "이후" 기능(보관 항목 복구, 알림, 이력서용 내보내기, GitHub 연동, Docker·CI).
 - 미뤄둔 것: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기, 프로젝트·태그·시스템 목록 페이징, `LEARNING_NOTES.md` 커밋, 저장소 이름 변경

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.worklog.project.dto.ProjectRequest;
@@ -32,10 +33,18 @@ public class ProjectController {
 	}
 
 	// GET /api/projects : 내 프로젝트 목록 (page, size, sort). 기본은 먼저 만든 순서.
+	// archived=true면 보관한 프로젝트만 보여준다(보관함).
 	@GetMapping
 	public Page<ProjectResponse> getProjects(@AuthenticationPrincipal Long memberId,
+			@RequestParam(defaultValue = "false") boolean archived,
 			@PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
-		return projectService.getProjects(memberId, pageable);
+		return projectService.getProjects(memberId, archived, pageable);
+	}
+
+	// POST /api/projects/{id}/restore : 보관한 프로젝트 복구
+	@PostMapping("/{id}/restore")
+	public ProjectResponse restoreProject(@PathVariable Long id, @AuthenticationPrincipal Long memberId) {
+		return projectService.restoreProject(id, memberId);
 	}
 
 	// GET /api/projects/{id} : 프로젝트 상세

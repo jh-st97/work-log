@@ -10,6 +10,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
 	// 내 프로젝트 중 보관 안 된 것을 페이지 단위로 조회
 	Page<Project> findByMemberIdAndArchivedAtIsNull(Long memberId, Pageable pageable);
+
+	// 내 프로젝트 중 보관한 것(보관함)을 페이지 단위로 조회
+	Page<Project> findByMemberIdAndArchivedAtIsNotNull(Long memberId, Pageable pageable);
 	
 	Optional<Project> findByIdAndMemberId(Long id, Long memberId);
 	

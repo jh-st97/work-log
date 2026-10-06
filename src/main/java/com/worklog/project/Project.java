@@ -84,6 +84,11 @@ public class Project extends BaseEntity{
 	public void archive() {
 		this.archivedAt = LocalDateTime.now();
 	}
+
+	// 보관을 되돌린다 (다시 활성 상태)
+	public void restore() {
+		this.archivedAt = null;
+	}
 	
 	
 

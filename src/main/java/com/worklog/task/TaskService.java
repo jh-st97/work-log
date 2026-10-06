@@ -58,9 +58,9 @@ public class TaskService {
 	@Transactional(readOnly = true)
 	public Page<TaskResponse> getTasks(Long memberId, TaskStatus status, TaskPriority priority, Long projectId,
 			Long systemId, Long tagId, LocalDate dueDateFrom, LocalDate dueDateTo, String keyword,
-			Pageable pageable) {
+			boolean archived, Pageable pageable) {
 		Specification<Task> spec = TaskSpecification.search(memberId, status, priority, projectId, systemId, tagId,
-				dueDateFrom, dueDateTo, keyword);
+				dueDateFrom, dueDateTo, keyword, archived);
 
 		Page<Task> tasks = taskRepository.findAll(spec, pageable);
 
@@ -142,6 +142,20 @@ public class TaskService {
 		task.archive();
 	}
 
+	// 보관한 업무를 되살린다. 속한 프로젝트가 아직 보관 중이면 되살려도 목록에 안 보이는
+	// 이상한 상태가 되므로, 막고 프로젝트부터 복구하라고 안내한다.
+	@Transactional
+	public TaskResponse restoreTask(Long id, Long memberId) {
+		Task task = findMyTask(id, memberId);
+
+		if (task.getProject().isArchived()) {
+			throw new BusinessException(ErrorCode.PROJECT_ARCHIVED);
+		}
+
+		task.restore();
+		return TaskResponse.of(task, getTagResponses(id), getWorkSystemResponses(id));
+	}
+
 	// 업무를 찾고, 진짜 내 것인지 확인 (Project와 같은 패턴: 없으면 404, 남의 것이면 403)
 	private Task findMyTask(Long id, Long memberId) {
 		Task task = taskRepository.findById(id)
@@ -160,6 +174,11 @@ public class TaskService {
 
 		if (!project.getMember().getId().equals(memberId)) {
 			throw new BusinessException(ErrorCode.PROJECT_ACCESS_DENIED);
+		}
+
+		// 보관 중인 프로젝트에는 업무를 새로 만들거나 옮겨 넣을 수 없다
+		if (project.isArchived()) {
+			throw new BusinessException(ErrorCode.PROJECT_ARCHIVED);
 		}
 
 		return project;

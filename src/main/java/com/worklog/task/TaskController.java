@@ -47,9 +47,11 @@ public class TaskController {
 			@RequestParam(required = false) LocalDate dueDateFrom,
 			@RequestParam(required = false) LocalDate dueDateTo,
 			@RequestParam(required = false) String keyword,
+			// true면 보관한 업무만 보여준다(보관함). 안 주면 보관 안 된 업무.
+			@RequestParam(defaultValue = "false") boolean archived,
 			@PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 		return taskService.getTasks(memberId, status, priority, projectId, systemId, tagId, dueDateFrom, dueDateTo,
-				keyword, pageable);
+				keyword, archived, pageable);
 	}
 
 	// GET /api/tasks/{id} : 업무 상세
@@ -71,6 +73,12 @@ public class TaskController {
 	public TaskResponse updateTask(@PathVariable Long id, @AuthenticationPrincipal Long memberId,
 			@Valid @RequestBody TaskRequest request) {
 		return taskService.updateTask(id, memberId, request);
+	}
+
+	// POST /api/tasks/{id}/restore : 보관한 업무 복구
+	@PostMapping("/{id}/restore")
+	public TaskResponse restoreTask(@PathVariable Long id, @AuthenticationPrincipal Long memberId) {
+		return taskService.restoreTask(id, memberId);
 	}
 
 	// PATCH /api/tasks/{id}/status : 상태만 따로 변경

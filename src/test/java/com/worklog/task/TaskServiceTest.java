@@ -148,7 +148,7 @@ class TaskServiceTest {
 
 		// 태그·시스템도 N+1 개선 이후 정확히 붙어서 나온다
 		TaskResponse found = taskService.getTasks(owner.getId(), null, TaskPriority.HIGH, null, null, null, null, null,
-				null, firstPage).getContent().get(0);
+				null, false, firstPage).getContent().get(0);
 		assertThat(found.tags()).extracting(t -> t.name()).containsExactly("Spring");
 		assertThat(found.systems()).extracting(s -> s.name()).containsExactly("회원 시스템");
 
@@ -157,7 +157,7 @@ class TaskServiceTest {
 
 	private List<String> titles(TaskStatus status, TaskPriority priority, Long tagId, Long systemId, String keyword) {
 		return taskService.getTasks(owner.getId(), status, priority, null, systemId, tagId, null, null, keyword,
-				firstPage).getContent().stream().map(TaskResponse::title).toList();
+				false, firstPage).getContent().stream().map(TaskResponse::title).toList();
 	}
 
 }

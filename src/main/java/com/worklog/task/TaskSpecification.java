@@ -16,16 +16,25 @@ import jakarta.persistence.criteria.Subquery;
 public class TaskSpecification {
 
 	public static Specification<Task> search(Long memberId, TaskStatus status, TaskPriority priority,
-			Long projectId, Long systemId, Long tagId, LocalDate dueDateFrom, LocalDate dueDateTo, String keyword) {
+			Long projectId, Long systemId, Long tagId, LocalDate dueDateFrom, LocalDate dueDateTo, String keyword,
+			boolean archived) {
 
 		// (root, query, cb) 세 개를 받는 람다 하나가 Specification이다.
 		// root: Task 테이블, query: 지금 짓고 있는 쿼리 전체, cb: 조건(=, LIKE, AND 등)을 만드는 도구
 		return (root, query, cb) -> {
 			List<Predicate> predicates = new ArrayList<>();
 
-			// 내 업무 중 보관 안 된 것만 (필터 여부와 상관없이 항상 적용)
+			// 내 업무만 (필터 여부와 상관없이 항상 적용)
 			predicates.add(cb.equal(root.get("member").get("id"), memberId));
-			predicates.add(cb.isNull(root.get("archivedAt")));
+
+			if (archived) {
+				// 보관함: 직접 보관한 업무만
+				predicates.add(cb.isNotNull(root.get("archivedAt")));
+			} else {
+				// 보통 목록: 보관 안 된 업무 중에서, 속한 프로젝트가 보관된 업무도 같이 숨긴다(기획서 규칙)
+				predicates.add(cb.isNull(root.get("archivedAt")));
+				predicates.add(cb.isNull(root.get("project").get("archivedAt")));
+			}
 
 			if (status != null) {
 				predicates.add(cb.equal(root.get("status"), status));
