@@ -1,7 +1,7 @@
 package com.worklog.worksystem;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,12 +27,10 @@ public class WorkSystemService {
 		this.taskWorkSystemRepository = taskWorkSystemRepository;
 	}
 
-	// 내 업무 시스템 전체 조회
-	public List<WorkSystemResponse> getWorkSystems(Long memberId) {
-		return workSystemRepository.findByMemberId(memberId)
-				.stream()
-				.map(WorkSystemResponse::from)
-				.toList();
+	// 내 업무 시스템 목록 조회 (페이징)
+	public Page<WorkSystemResponse> getWorkSystems(Long memberId, Pageable pageable) {
+		return workSystemRepository.findByMemberId(memberId, pageable)
+				.map(WorkSystemResponse::from);
 	}
 
 	// 업무 시스템 등록

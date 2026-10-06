@@ -408,6 +408,13 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 - 프론트: 업무 카드 체크박스(페이지를 넘겨도 선택 유지) → "이력서용 내보내기" → 미리보기 + 복사 + `.md` 파일 저장. 자세한 건 프론트 CLAUDE.md.
 - **[도구 참고] Vite 개발 서버가 파일 수정을 놓쳐 이전 버전을 서빙한 적 있음**(`curl http://localhost:5173/src/...`로 확인했더니 최신 수정이 빠져 있었음, `?t=` 쿼리를 붙이면 최신). 화면이 새 코드를 반영 안 하면 개발 서버를 껐다 켤 것.
 
+### 완료 (2026-10-06, 404 처리와 목록 페이징 — 미뤄둔 항목 정리)
+- **에러 응답 정리**(`GlobalExceptionHandler`): 없는 주소 `NoResourceFoundException` → 404 `RESOURCE_NOT_FOUND`(스프링은 못 찾은 주소를 정적 파일 요청으로 봐서 이 예외를 던짐), 주소는 맞고 방식이 틀림 `HttpRequestMethodNotSupportedException` → 405 `METHOD_NOT_ALLOWED`, 깨진 JSON `HttpMessageNotReadableException`·번호 자리에 글자/잘못된 날짜 `MethodArgumentTypeMismatchException` → 400 `INVALID_INPUT`. 나머지는 계속 500. **로그인 안 한 채 없는 주소를 부르면 여전히 401**(주소 존재 여부를 알려주지 않는 게 의도). 이전 CLAUDE.md의 "없는 경로가 401/500으로 나옴"은 해결됨.
+- `ErrorResponseControllerTest`(5개)로 위 응답 코드를 고정.
+- **프로젝트·태그·업무 시스템 목록 페이징**(사용자가 "세 목록 모두"를 선택, 기획서 원칙): `GET /api/projects|tags|systems`가 `page`/`size`/`sort`를 받아 `Page`로 응답(기본 `size=20`, `createdAt` 오름차순 = 먼저 만든 순). 레포지토리 `findByMemberId...(memberId, Pageable)`로 바뀌어 기존 `List` 버전은 삭제. `ListPagingControllerTest`(4개).
+- **프론트는 화면 코드를 안 바꿨음**: `getProjects/getTags/getWorkSystems`가 `?size=1000`으로 받아 `content`만 돌려줌(업무 화면 드롭다운·체크박스에 전체가 필요해서). 한 종류가 1000개를 넘으면 잘리는 한계가 있으나 개인용이라 허용. 사용자에게 "페이징 효과가 작다"고 설명했지만 원칙대로 하기로 함.
+- 전체 테스트 통과 + 서버 재시작 후 네 화면(프로젝트·태그·업무 시스템·업무)이 정상으로 뜨는 것 확인.
+
 ### 다음 단계
 - 기획서 1~5단계 완료. 남은 것은 아래 "미뤄둔 것"과 기획서의 "이후" 기능(보관 항목 복구, 알림, 이력서용 내보내기, GitHub 연동, Docker·CI).
 - 미뤄둔 것: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기, 프로젝트·태그·시스템 목록 페이징, `LEARNING_NOTES.md` 커밋, 저장소 이름 변경

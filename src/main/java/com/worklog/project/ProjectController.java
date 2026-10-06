@@ -1,7 +1,9 @@
 package com.worklog.project;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,10 +31,11 @@ public class ProjectController {
 		this.projectService = projectService;
 	}
 
-	// GET /api/projects : 내 프로젝트 목록
+	// GET /api/projects : 내 프로젝트 목록 (page, size, sort). 기본은 먼저 만든 순서.
 	@GetMapping
-	public List<ProjectResponse> getProjects(@AuthenticationPrincipal Long memberId) {
-		return projectService.getProjects(memberId);
+	public Page<ProjectResponse> getProjects(@AuthenticationPrincipal Long memberId,
+			@PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+		return projectService.getProjects(memberId, pageable);
 	}
 
 	// GET /api/projects/{id} : 프로젝트 상세

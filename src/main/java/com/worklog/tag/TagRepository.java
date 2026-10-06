@@ -1,14 +1,15 @@
 package com.worklog.tag;
 
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TagRepository extends JpaRepository<Tag, Long> {
 
-	// 내 태그 전체 조회 (태그는 보관 개념이 없어서 archivedAt 조건 없음)
-	List<Tag> findByMemberId(Long memberId);
+	// 내 태그를 페이지 단위로 조회 (태그는 보관 개념이 없어서 archivedAt 조건 없음)
+	Page<Tag> findByMemberId(Long memberId, Pageable pageable);
 
 	// 태그 번호 + 회원 번호를 같이 확인해서, 남의 태그를 못 만지게 막는 용도
 	Optional<Tag> findByIdAndMemberId(Long id, Long memberId);

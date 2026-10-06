@@ -1,7 +1,7 @@
 package com.worklog.project;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,11 +24,9 @@ public class ProjectService {
 	}
 
 	// 내 프로젝트 목록 조회 (보관된 것 제외)
-	public List<ProjectResponse> getProjects(Long memberId) {
-		return projectRepository.findByMemberIdAndArchivedAtIsNull(memberId)
-				.stream()
-				.map(ProjectResponse::from) // Project 엔티티 목록을 ProjectResponse 목록으로 하나씩 변환
-				.toList();
+	public Page<ProjectResponse> getProjects(Long memberId, Pageable pageable) {
+		return projectRepository.findByMemberIdAndArchivedAtIsNull(memberId, pageable)
+				.map(ProjectResponse::from); // Project 엔티티를 ProjectResponse로 하나씩 변환
 	}
 
 	// 프로젝트 상세 조회 (내 것인지 확인 포함)

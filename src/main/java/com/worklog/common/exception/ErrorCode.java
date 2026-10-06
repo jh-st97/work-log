@@ -23,6 +23,8 @@ public enum ErrorCode {
 	DAILY_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 일일 기록입니다."),
 	TASK_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 진행 메모입니다."),
 	TASK_LOG_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 진행 메모에 접근할 권한이 없습니다."),
+	RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 주소를 찾을 수 없습니다."),
+	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다."),
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 	
 	private final HttpStatus status;

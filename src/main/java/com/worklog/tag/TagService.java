@@ -1,7 +1,7 @@
 package com.worklog.tag;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,12 +27,10 @@ public class TagService {
 		this.taskTagRepository = taskTagRepository;
 	}
 
-	// 내 태그 전체 조회
-	public List<TagResponse> getTags(Long memberId) {
-		return tagRepository.findByMemberId(memberId)
-				.stream()
-				.map(TagResponse::from)
-				.toList();
+	// 내 태그 목록 조회 (페이징)
+	public Page<TagResponse> getTags(Long memberId, Pageable pageable) {
+		return tagRepository.findByMemberId(memberId, pageable)
+				.map(TagResponse::from);
 	}
 
 	// 태그 등록
