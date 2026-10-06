@@ -61,6 +61,7 @@ public class TaskLogService {
 	}
 
 	// 업무별 진행 메모 조회 (시간순)
+	@Transactional(readOnly = true)
 	public List<TaskLogResponse> getTaskLogsByTask(Long taskId, Long memberId) {
 		findMyTask(taskId, memberId);
 

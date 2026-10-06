@@ -40,6 +40,7 @@ public class DailyLogService {
 
 	// 하루 일지 조회. 아직 기록이 없으면 404 (자동으로 만들어주지 않음 — 저장은 PUT에서만)
 	// 회고와 그날의 진행 메모를 같이 보여준다 (기획서 규칙)
+	@Transactional(readOnly = true)
 	public DailyLogResponse getDailyLog(Long memberId, LocalDate date) {
 		DailyLog dailyLog = findMyDailyLog(memberId, date)
 				.orElseThrow(() -> new BusinessException(ErrorCode.DAILY_LOG_NOT_FOUND));

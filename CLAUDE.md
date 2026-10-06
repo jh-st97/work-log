@@ -363,8 +363,18 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 - **테스트가 찾아낸 서버 코드의 약점: 조회 메서드의 `LazyInitializationException`.** `TaskService.getTasks`/`getTask`가 트랜잭션 없이 LAZY 연관관계(`TaskTag.tag`)의 이름을 읽고 있었는데, 실제 서버에서는 OSIV(요청이 끝날 때까지 DB 세션을 열어둠) 덕분에 문제가 안 보였음. 웹 요청이 없는 테스트에서 처음 드러남. **두 메서드에 `@Transactional(readOnly = true)`를 붙여 해결.** 같은 구조(트랜잭션 없는 조회가 LAZY 연관관계를 읽음)가 `DailyLogService.getDailyLog`, `TaskLogService.getTaskLogsByTask`, `TaskResultService.getResults` 등에도 있을 수 있어 해당 서비스 테스트를 쓸 때 같이 확인할 것.
 - Mockito 실행 시 "self-attaching to enable the inline-mock-maker" 경고는 JDK 21에서 나오는 안내일 뿐 실패 원인이 아님(지금은 무시).
 
+### 완료 (2026-10-06, 기획서 5단계 — 나머지 서비스 테스트)
+- 공통 베이스 `support/ServiceTestSupport`(`@SpringBootTest` abstract): 매 테스트 전에 `TRUNCATE ... CASCADE`로 비우고 `owner`, `other` 회원과 각자의 프로젝트(`project`, `otherProject`)를 준비, `createTask(title)` 헬퍼 제공. 새 서비스 테스트는 이걸 상속(`extends`)해서 쓸 것. (`TaskServiceTest`는 베이스 도입 전에 만들어서 자체 준비 코드를 가짐.)
+- `DailyLogServiceTest`(4): 같은 날 두 번 저장은 upsert(행 1개 유지)·없는 날짜 404·다른 회원 일지와 분리·하루 일지에 진행 메모(업무 제목·날짜) 포함·기간 목록 범위+페이징(남의 일지 제외, 목록은 `taskLogs` 빈 배열).
+- `TaskLogServiceTest`(7): 일일 기록 자동 생성(summary=null)·같은 날 메모 여러 개·남의 업무에 등록 차단(`TASK_ACCESS_DENIED`)·남의 메모 수정/삭제 차단(`TASK_LOG_ACCESS_DENIED`)·수정·삭제·없는 메모 404·업무별 시간순 조회.
+- `TaskResultServiceTest`(3): CRUD(개선 전 null 허용)·남의 업무 차단·다른 업무의 성과 항목을 내 다른 업무 주소로 접근 시 `TASK_RESULT_NOT_FOUND`.
+- **예측대로 `LazyInitializationException` 2건이 실제로 실패로 드러남** → `DailyLogService.getDailyLog`, `TaskLogService.getTaskLogsByTask`에 `@Transactional(readOnly = true)` 추가로 해결(TaskService 때와 같은 원인: 진행 메모 응답이 LAZY 연관관계 `task.title`, `dailyLog.logDate`를 읽음). **규칙: 응답을 만들 때 LAZY 연관관계를 읽는 조회 메서드에는 `@Transactional(readOnly = true)`를 붙인다.**
+- `TagServiceTest`(1): 같은 이름 태그 중복 등록 시 `TAG_DUPLICATED`. **사용자가 뼈대(빈칸 채우기)를 받아서 직접 작성**(첫 테스트 작성 연습). 뼈대에 `fail(...)`을 넣어 "안 쓴 테스트가 초록색으로 보이는 오해"를 막는 방식을 씀.
+- 테스트를 쓸지 판단하는 기준(사용자와 합의): "틀렸을 때 눈치채기 어렵고 피해가 큰가?" — 소유권·권한, 규칙이 있는 로직, DB 제약과 얽힌 곳, 버그가 났던 곳은 쓰고, 단순 CRUD는 생략. 지금 테스트가 없는 곳: 로그인·가입, 프로젝트·태그(중복 외)·업무 시스템 CRUD.
+- 전체 테스트(서비스 15개)는 STS에서 사용자가 실행해 전부 통과 확인.
+
 ### 다음 단계
-- 기획서 5단계 남은 것: 나머지 서비스 테스트(DailyLog·TaskLog 등), 컨트롤러 통합 테스트(JWT 포함), README
+- 기획서 5단계 남은 것: 컨트롤러 통합 테스트(JWT 로그인·401·403 응답 코드 포함), README
 - 미뤄둔 것들: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기(`NoHandlerFoundException`), `LEARNING_NOTES.md` 커밋, 프로젝트·태그·시스템 목록 페이징(지금은 전체 반환), 저장소 이름 `work-log-backend`로 변경
 - [도구 참고] 이 세션의 Claude 브라우저는 작업 디렉터리가 백엔드라 `preview_start`의 `launch.json`이 프론트엔드를 못 띄움 → Bash `run_in_background`로 `npm run dev`를 띄우고 `navigate`로 접속하는 방식을 씀. 사용자가 따로 `npm run dev`를 켜 두면 5174로 밀려 CORS 에러가 나니 포트 겹침 먼저 확인.
 
