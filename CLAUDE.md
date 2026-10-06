@@ -346,8 +346,15 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 - 필터 각각·조합(AND)·페이징(`size=1`)·키워드(영문·한글)·없는 태그(빈 목록) 전부 실제 요청으로 검증 완료. 한글 키워드는 URL 퍼센트 인코딩(`%EB%94%94...`)으로 보내면 Git Bash 인코딩 문제를 피할 수 있음.
 - 프론트엔드 필터 UI·페이지 이동은 `work-log-frontend`의 CLAUDE.md 참고.
 
+### 완료 (2026-10-06, 기획서 5단계 — Swagger)
+- `springdoc-openapi-starter-webmvc-ui` **3.1.1** 추가(`pom.xml`). Spring Boot 4.x는 springdoc **v3 시리즈**를 써야 하고, v2는 Spring Boot 3용이라 시작 때 에러가 남. 오픈소스(Apache 2.0)라 무료.
+- `SecurityConfig`의 `permitAll()`에 `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**` 추가(화면·설명서만 열림, 실제 API는 여전히 토큰 필요 — 토큰 없이 `/api/tasks`는 401).
+- `config/OpenApiConfig`(새 파일): 제목·설명 + `bearerAuth`(HTTP bearer JWT) 보안 스킴을 등록해서 Swagger 화면에 Authorize 버튼이 생기고 토큰을 한 번 넣으면 모든 호출에 자동으로 붙음. 사용자가 `SecurityConfig` 수정은 직접, `OpenApiConfig`도 직접 작성.
+- 접속: `http://localhost:8080/swagger-ui.html`(→ `/swagger-ui/index.html`로 302). `/v3/api-docs`에 우리 API 21개 경로 확인. 로그인 → Authorize → `GET /api/tasks` 200까지 사용자가 직접 확인.
+- **[함정] STS에서 `ClassNotFoundException: io.swagger.v3.oas.models.OpenAPI`**: `pom.xml`에 의존성을 추가했는데 `mvnw` 컴파일·`dependency:tree`는 정상이고 STS의 Maven Dependencies에도 jar가 보이는데 실행만 실패함. **Maven → Update Project만으로는 안 풀렸고, Project → Clean 후 재시작으로 해결.** 새 의존성을 추가하면 Update Project → Clean → 재시작 순서로 할 것.
+
 ### 다음 단계
-- 기획서 5단계: 테스트 코드, Swagger 정리, README
+- 기획서 5단계 남은 것: 테스트 코드(서비스 단위 테스트 + 컨트롤러 통합 테스트, 테스트용 DB를 어떻게 할지 먼저 정해야 함), README
 - 미뤄둔 것들: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기(`NoHandlerFoundException`), `LEARNING_NOTES.md` 커밋, 프로젝트·태그·시스템 목록 페이징(지금은 전체 반환), 저장소 이름 `work-log-backend`로 변경
 - [도구 참고] 이 세션의 Claude 브라우저는 작업 디렉터리가 백엔드라 `preview_start`의 `launch.json`이 프론트엔드를 못 띄움 → Bash `run_in_background`로 `npm run dev`를 띄우고 `navigate`로 접속하는 방식을 씀. 사용자가 따로 `npm run dev`를 켜 두면 5174로 밀려 CORS 에러가 나니 포트 겹침 먼저 확인.
 
