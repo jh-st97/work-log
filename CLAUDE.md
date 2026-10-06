@@ -391,6 +391,14 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 
 **이걸로 기획서 5단계(테스트, Swagger, README)가 모두 끝났다.**
 
+### 완료 (2026-10-06, 태그·업무 시스템 삭제 시 연결 처리)
+- **결정(사용자): 업무에 붙은 태그/업무 시스템을 삭제하면 "연결만 끊고 삭제"**(업무 자체는 그대로). 대안이던 "막고 409로 안내"는 지우려면 업무에서 하나씩 먼저 떼야 해서 번거로워 제외. 태그는 단순한 꼬리표라 이게 가장 자연스러움.
+- **원래 문제**: `TagService.deleteTag`/`WorkSystemService.deleteWorkSystem`이 연결 검사 없이 바로 삭제 → `task_tag.tag_id`·`task_work_system.work_system_id` FK 때문에 업무에 붙은 걸 지우면 DB가 거부해 500 에러.
+- 구현: `TaskTagRepository.deleteByTagId`, `TaskWorkSystemRepository.deleteByWorkSystemId` 추가. 삭제 전에 연결을 먼저 지우고 `flush()`한 뒤 태그/시스템을 삭제(업무 수정 때처럼 삭제 순서를 확실히 하려고). `TagService`/`WorkSystemService`가 task 패키지 레포지토리를 주입받음.
+- 테스트: `WorkSystemServiceTest`(새 파일, Claude 작성)와 `TagServiceTest`에 "붙어 있는 걸 삭제해도 연결만 끊기고 업무는 남는다" 추가(태그 쪽은 사용자가 뼈대를 채워 직접 작성). 전체 통과.
+- 프론트: `TagsPage`·`WorkSystemsPage`의 삭제 확인창 문구에 "붙은 업무에서도 빠집니다(업무 자체는 그대로)"를 추가.
+- 성과 항목·진행 메모 삭제 처리는 기획서의 "아직 정하지 않은 것"이었지만, 둘 다 진짜 삭제이고 다른 테이블이 이들을 참조하지 않아 문제 없음.
+
 ### 다음 단계
 - 기획서 1~5단계 완료. 남은 것은 아래 "미뤄둔 것"과 기획서의 "이후" 기능(보관 항목 복구, 알림, 이력서용 내보내기, GitHub 연동, Docker·CI).
 - 미뤄둔 것: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기, 프로젝트·태그·시스템 목록 페이징, `LEARNING_NOTES.md` 커밋, 저장소 이름 변경

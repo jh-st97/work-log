@@ -11,16 +11,20 @@ import com.worklog.member.Member;
 import com.worklog.member.MemberRepository;
 import com.worklog.tag.dto.TagRequest;
 import com.worklog.tag.dto.TagResponse;
+import com.worklog.task.TaskTagRepository;
 
 @Service
 public class TagService {
 
 	private final TagRepository tagRepository;
 	private final MemberRepository memberRepository;
+	private final TaskTagRepository taskTagRepository;
 
-	public TagService(TagRepository tagRepository, MemberRepository memberRepository) {
+	public TagService(TagRepository tagRepository, MemberRepository memberRepository,
+			TaskTagRepository taskTagRepository) {
 		this.tagRepository = tagRepository;
 		this.memberRepository = memberRepository;
+		this.taskTagRepository = taskTagRepository;
 	}
 
 	// 내 태그 전체 조회
@@ -61,10 +65,14 @@ public class TagService {
 		return TagResponse.from(tag);
 	}
 
-	// 태그 삭제 (보관 처리 없이 진짜로 삭제)
+	// 태그 삭제 (보관 처리 없이 진짜로 삭제).
+	// 업무에 붙어 있던 태그면 연결(task_tag)부터 끊고 지운다 — 업무 자체는 그대로 남는다.
+	// 연결을 안 끊고 지우면 DB의 FK 제약에 걸려 500 에러가 난다.
 	@Transactional
 	public void deleteTag(Long id, Long memberId) {
 		Tag tag = findMyTag(id, memberId);
+		taskTagRepository.deleteByTagId(id);
+		taskTagRepository.flush();
 		tagRepository.delete(tag);
 	}
 

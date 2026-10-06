@@ -15,4 +15,7 @@ public interface TaskWorkSystemRepository extends JpaRepository<TaskWorkSystem, 
 	// 업무 수정 시 업무 시스템을 통째로 다시 붙이기 위해, 기존 연결을 전부 지운다
 	void deleteByTaskId(Long taskId);
 
+	// 업무 시스템을 삭제하기 전에, 이 시스템이 달려 있던 모든 업무에서 연결만 끊는다
+	void deleteByWorkSystemId(Long workSystemId);
+
 }

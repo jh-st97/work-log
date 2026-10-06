@@ -9,6 +9,7 @@ import com.worklog.common.exception.BusinessException;
 import com.worklog.common.exception.ErrorCode;
 import com.worklog.member.Member;
 import com.worklog.member.MemberRepository;
+import com.worklog.task.TaskWorkSystemRepository;
 import com.worklog.worksystem.dto.WorkSystemRequest;
 import com.worklog.worksystem.dto.WorkSystemResponse;
 
@@ -17,10 +18,13 @@ public class WorkSystemService {
 
 	private final WorkSystemRepository workSystemRepository;
 	private final MemberRepository memberRepository;
+	private final TaskWorkSystemRepository taskWorkSystemRepository;
 
-	public WorkSystemService(WorkSystemRepository workSystemRepository, MemberRepository memberRepository) {
+	public WorkSystemService(WorkSystemRepository workSystemRepository, MemberRepository memberRepository,
+			TaskWorkSystemRepository taskWorkSystemRepository) {
 		this.workSystemRepository = workSystemRepository;
 		this.memberRepository = memberRepository;
+		this.taskWorkSystemRepository = taskWorkSystemRepository;
 	}
 
 	// 내 업무 시스템 전체 조회
@@ -59,10 +63,13 @@ public class WorkSystemService {
 		return WorkSystemResponse.from(workSystem);
 	}
 
-	// 업무 시스템 삭제 (보관 처리 없이 진짜로 삭제)
+	// 업무 시스템 삭제 (보관 처리 없이 진짜로 삭제).
+	// 업무에 붙어 있던 시스템이면 연결(task_work_system)부터 끊고 지운다 — 업무 자체는 그대로 남는다.
 	@Transactional
 	public void deleteWorkSystem(Long id, Long memberId) {
 		WorkSystem workSystem = findMyWorkSystem(id, memberId);
+		taskWorkSystemRepository.deleteByWorkSystemId(id);
+		taskWorkSystemRepository.flush();
 		workSystemRepository.delete(workSystem);
 	}
 

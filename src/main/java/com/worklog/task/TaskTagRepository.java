@@ -14,6 +14,9 @@ public interface TaskTagRepository extends JpaRepository<TaskTag, Long> {
 
 	// 업무 수정 시 태그를 통째로 다시 붙이기 위해, 기존 연결을 전부 지운다
 	void deleteByTaskId(Long taskId);
+
+	// 태그를 삭제하기 전에, 이 태그가 달려 있던 모든 업무에서 연결만 끊는다
+	void deleteByTagId(Long tagId);
 	
 
 }
