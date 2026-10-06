@@ -45,6 +45,11 @@
 - 필터: 상태, 우선순위, 프로젝트, 시스템, 태그, 마감일 범위, 키워드
 - 페이징
 
+**이력서용 내보내기**
+
+- 고른 업무들을 마크다운 문서로 만들어 복사하거나 `.md` 파일로 저장
+- 업무마다 프로젝트, 기간, 사용 기술, 성과(개선 전 → 후), 진행 과정(겪은 문제와 해결)을 담음
+
 같은 진행 메모를 **날짜별**로 보면 "그날 무엇을 했는지"가 됩니다.
 **업무별**로 보면 "이 업무를 어떤 과정으로 풀었는지"가 됩니다.
 
@@ -226,6 +231,10 @@ H2 같은 메모리 DB 대신 실제 PostgreSQL을 쓴 이유는 다음과 같�
 - `DELETE /api/task-logs/{id}` 삭제
 - `GET /api/tasks/{taskId}/task-logs` 업무별 조회 (시간순)
 
+**내보내기**
+
+- `GET /api/exports/resume?taskIds=1&taskIds=2` 고른 업무들을 이력서용 마크다운으로 (`{"markdown": "..."}`)
+
 업무 목록(`GET /api/tasks`)은 아래 필터를 자유롭게 조합할 수 있습니다.
 `status`, `priority`, `projectId`, `systemId`, `tagId`, `dueDateFrom`, `dueDateTo`, `keyword`
 
@@ -277,7 +286,6 @@ QueryDSL은 빌드 설정이 무겁고, 문자열 JPQL 조립은 조건이 늘�
 
 ## 앞으로 할 일
 
-- 컨트롤러 통합 테스트(JWT 인증, 응답 코드)
 - Refresh Token (현재는 만료되면 다시 로그인)
-- 보관한 업무·프로젝트 복구, 알림, 이력서용 마크다운 내보내기
+- 보관한 업무·프로젝트 복구, 알림
 - Docker, GitHub Actions
