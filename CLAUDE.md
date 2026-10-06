@@ -353,8 +353,18 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 - 접속: `http://localhost:8080/swagger-ui.html`(→ `/swagger-ui/index.html`로 302). `/v3/api-docs`에 우리 API 21개 경로 확인. 로그인 → Authorize → `GET /api/tasks` 200까지 사용자가 직접 확인.
 - **[함정] STS에서 `ClassNotFoundException: io.swagger.v3.oas.models.OpenAPI`**: `pom.xml`에 의존성을 추가했는데 `mvnw` 컴파일·`dependency:tree`는 정상이고 STS의 Maven Dependencies에도 jar가 보이는데 실행만 실패함. **Maven → Update Project만으로는 안 풀렸고, Project → Clean 후 재시작으로 해결.** 새 의존성을 추가하면 Update Project → Clean → 재시작 순서로 할 것.
 
+### 완료 (2026-10-06, 기획서 5단계 — 테스트 코드 시작)
+- **테스트용 DB는 H2가 아니라 같은 PostgreSQL에 `work_log_test` DB를 따로 만들어 사용**(사용자가 `CREATE DATABASE work_log_test;` 직접 실행). 이 프로젝트의 위험 지점이 DB 제약과 JPA 동작이라 실제와 같은 DB로 검증해야 의미가 있어서. Docker가 필요한 Testcontainers는 "이후" 단계로 미룸.
+- `src/test/resources/schema.sql`: 10개 테이블을 ERD대로(유니크·FK·CHECK·인덱스 포함) `DROP → CREATE`. Hibernate가 자동 생성하게 두지 않은 이유는, 엔티티에 없는 DB 전용 제약(예: `task_tag (task_id, tag_id)` 유니크)이 있어야 실제 버그를 잡을 수 있어서. **테이블을 바꾸면 이 파일도 같이 고칠 것.**
+- `src/test/resources/application.yml`: 테스트 때는 `src/main`의 설정 대신 이 파일이 **통째로** 쓰임(같은 이름이면 병합이 아니라 대체). `work_log_test`에 연결, `spring.sql.init.mode=always`로 매번 schema.sql 실행, `ddl-auto: validate`, 테스트용 JWT 키. DB 비밀번호는 `${DB_PASSWORD}`.
+- **테스트는 STS에서 실행**(우클릭 → Run As → JUnit Test). `DB_PASSWORD`가 STS 실행 설정에만 있고 Claude 터미널엔 없어서 Claude는 `mvnw test`를 못 돌림 → 컴파일(`./mvnw -q test-compile`)까지만 확인하고, 실행 결과는 사용자에게 받음. **JUnit 실행 설정은 클래스마다 따로 생기므로 Run Configurations → JUnit → Environment 탭에 `DB_PASSWORD`를 넣어야 함.**
+- `TaskServiceTest`(3개, 전부 통과): ① 같은 태그·시스템을 그대로 두고 업무 수정해도 중복 키 오류가 안 남(Hibernate flush 순서 버그 회귀 방지), ② 남의 업무 수정·조회는 `TASK_ACCESS_DENIED`, ③ 업무 목록 필터(우선순위·상태·태그·시스템·키워드·조합·없는 태그)와 남의 업무·보관 업무 제외, 태그·시스템이 정확히 붙는지.
+- **테스트 설계 주의: 테스트 클래스에 `@Transactional`을 붙이지 않음.** 붙이면 테스트 전체가 하나의 트랜잭션이라 끝에 롤백되면서 INSERT/DELETE가 실제로 DB에 실행되지 않아 중복 키 같은 제약 문제를 못 잡음. 대신 `@BeforeEach`에서 `TRUNCATE TABLE member RESTART IDENTITY CASCADE`로 비움.
+- **테스트가 찾아낸 서버 코드의 약점: 조회 메서드의 `LazyInitializationException`.** `TaskService.getTasks`/`getTask`가 트랜잭션 없이 LAZY 연관관계(`TaskTag.tag`)의 이름을 읽고 있었는데, 실제 서버에서는 OSIV(요청이 끝날 때까지 DB 세션을 열어둠) 덕분에 문제가 안 보였음. 웹 요청이 없는 테스트에서 처음 드러남. **두 메서드에 `@Transactional(readOnly = true)`를 붙여 해결.** 같은 구조(트랜잭션 없는 조회가 LAZY 연관관계를 읽음)가 `DailyLogService.getDailyLog`, `TaskLogService.getTaskLogsByTask`, `TaskResultService.getResults` 등에도 있을 수 있어 해당 서비스 테스트를 쓸 때 같이 확인할 것.
+- Mockito 실행 시 "self-attaching to enable the inline-mock-maker" 경고는 JDK 21에서 나오는 안내일 뿐 실패 원인이 아님(지금은 무시).
+
 ### 다음 단계
-- 기획서 5단계 남은 것: 테스트 코드(서비스 단위 테스트 + 컨트롤러 통합 테스트, 테스트용 DB를 어떻게 할지 먼저 정해야 함), README
+- 기획서 5단계 남은 것: 나머지 서비스 테스트(DailyLog·TaskLog 등), 컨트롤러 통합 테스트(JWT 포함), README
 - 미뤄둔 것들: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기(`NoHandlerFoundException`), `LEARNING_NOTES.md` 커밋, 프로젝트·태그·시스템 목록 페이징(지금은 전체 반환), 저장소 이름 `work-log-backend`로 변경
 - [도구 참고] 이 세션의 Claude 브라우저는 작업 디렉터리가 백엔드라 `preview_start`의 `launch.json`이 프론트엔드를 못 띄움 → Bash `run_in_background`로 `npm run dev`를 띄우고 `navigate`로 접속하는 방식을 씀. 사용자가 따로 `npm run dev`를 켜 두면 5174로 밀려 CORS 에러가 나니 포트 겹침 먼저 확인.
 

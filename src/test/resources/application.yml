@@ -1,0 +1,21 @@
+# 테스트 전용 설정. 테스트를 돌리면 src/main 의 application.yml 대신 이 파일이 쓰인다.
+# (같은 이름이면 테스트 쪽이 통째로 우선이라, 필요한 설정을 여기에 전부 다시 적는다)
+spring:
+  datasource:
+    # 진짜 DB(work_log)가 아니라 테스트 전용 DB에만 연결한다
+    url: jdbc:postgresql://localhost:5432/work_log_test
+    username: postgres
+    password: ${DB_PASSWORD}
+  sql:
+    init:
+      # 테스트가 시작될 때마다 schema.sql로 테이블을 새로 만든다
+      mode: always
+      schema-locations: classpath:schema.sql
+  jpa:
+    hibernate:
+      # 엔티티와 테이블이 맞는지 검사만 한다(진짜 앱과 동일)
+      ddl-auto: validate
+
+jwt:
+  # 테스트용 임시 키 (HS256은 32바이트 이상 필요)
+  secret: test-secret-key-for-work-log-tests-0123456789

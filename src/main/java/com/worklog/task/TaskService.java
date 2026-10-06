@@ -53,6 +53,9 @@ public class TaskService {
 
 	// 내 업무 목록. 상태·우선순위·프로젝트·시스템·태그·마감일 범위·키워드를 조합해서 걸러내고, 페이징한다.
 	// null인 필터는 TaskSpecification에서 건너뛴다 — 아무 필터도 안 주면 "보관 안 된 내 업무 전체"가 된다.
+	// 읽기 전용 트랜잭션: 지연 로딩(LAZY)인 태그·시스템 이름을 읽는 동안 DB 세션을 열어둔다.
+	// 이게 없으면 웹 요청 밖(테스트 등)에서 LazyInitializationException이 난다.
+	@Transactional(readOnly = true)
 	public Page<TaskResponse> getTasks(Long memberId, TaskStatus status, TaskPriority priority, Long projectId,
 			Long systemId, Long tagId, LocalDate dueDateFrom, LocalDate dueDateTo, String keyword,
 			Pageable pageable) {
@@ -72,6 +75,7 @@ public class TaskService {
 				systemsByTaskId.getOrDefault(task.getId(), List.of())));
 	}
 
+	@Transactional(readOnly = true)
 	public TaskResponse getTask(Long id, Long memberId) {
 		Task task = findMyTask(id, memberId);
 		return TaskResponse.of(task, getTagResponses(id), getWorkSystemResponses(id));
