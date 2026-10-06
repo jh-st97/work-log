@@ -380,8 +380,19 @@ CORS까지 포함해 기획서 1단계(회원가입, 로그인, JWT 인증, 에�
 - 미확인: README의 N+1 쿼리 개수(`1 + 2N` → 고정 3개)는 계산한 값이고 쿼리 로그로 직접 센 건 아님. 면접에서 숫자를 말할 거면 `show-sql` 로그로 확인할 것.
 - 저장소 이름을 `work-log-backend`로 바꾸면 두 README의 링크(`github.com/jh-st97/work-log`)도 같이 고칠 것.
 
+### 완료 (2026-10-06, 기획서 5단계 — 컨트롤러 통합 테스트)
+- `support/ControllerTestSupport`(`@SpringBootTest` + `@AutoConfigureMockMvc`): `MockMvc`로 서버를 띄우지 않고 보안 필터(JWT)·컨트롤러·서비스·DB를 전부 거치는 요청을 보냄. 도우미 `signupAndLogin(email)`(토큰 반환), `createProject`, `createTask`, `bearer(token)`. Spring Boot 4라서 어노테이션 패키지가 `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc`임(Boot 3과 다름). JSON 응답은 `com.jayway.jsonpath.JsonPath`로 읽음(Jackson `ObjectMapper` 안 씀). 요청 본문은 문자열로 직접 조립(ASCII만 써서 인코딩 문제 회피). 한글 메시지는 단언하지 않고 `code`만 확인.
+- `AuthControllerTest`(7): 가입 201(응답에 비밀번호 없음)·이메일 중복 409 `EMAIL_DUPLICATED`·짧은 비밀번호 400 `INVALID_INPUT`·로그인 토큰 발급·틀린 비밀번호와 없는 이메일이 똑같이 401 `LOGIN_FAILED`·유효 토큰으로 `/api/members/me` 200·토큰 없음/가짜 토큰 401 `UNAUTHORIZED`.
+- `TaskControllerTest`(8): 보호된 API 토큰 없이 401·Swagger `/v3/api-docs`는 열리지만 실제 API는 여전히 401·업무 생성 후 내 목록에 나옴·남의 업무는 목록에 안 나오고 상세·수정 403 `TASK_ACCESS_DENIED`·없는 업무 404·제목 없음/프로젝트 없음 400·`GET /api/daily-logs`에서 `from/to` 누락 시 400(401 아님)·남의 프로젝트에 업무 등록 403 `PROJECT_ACCESS_DENIED`.
+- 전체 35개(서비스 + 컨트롤러 + 앱 기동 테스트) STS에서 통과.
+- **테스트가 실제로 구멍을 잡는지 직접 실험함**: `TaskService.findMyTask`의 소유권 검사를 일부러 주석 처리 → `Failures: 2`로 실패 → 되돌리자 35/35 통과. 화면으로는 안 보이는 보안 구멍을 테스트가 잡아준다는 걸 사용자가 직접 확인.
+- **[STS 함정] 코드를 바꿨는데 테스트 결과가 안 맞으면(구멍을 뚫었는데 초록색) Project → Clean 후 다시 돌릴 것.** 소스·`target/classes` 파일은 이미 새것인데도 STS가 옛 코드를 써서 초록색이 나온 적이 있음(`ClassNotFoundException` 때와 같은 계열). 테스트 결과를 믿기 전에, 의심스러우면 Clean 먼저.
+- 주의: 테스트를 쓸 때 이 STS는 `target/test-classes` 갱신이 늦을 수 있음. 새 테스트 파일은 Refresh 후 실행.
+
+**이걸로 기획서 5단계(테스트, Swagger, README)가 모두 끝났다.**
+
 ### 다음 단계
-- 기획서 5단계 남은 것: 컨트롤러 통합 테스트(JWT 로그인·401·403 응답 코드 포함)
+- 기획서 1~5단계 완료. 남은 것은 아래 "미뤄둔 것"과 기획서의 "이후" 기능(보관 항목 복구, 알림, 이력서용 내보내기, GitHub 연동, Docker·CI).
 - 미뤄둔 것: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기, 프로젝트·태그·시스템 목록 페이징, `LEARNING_NOTES.md` 커밋, 저장소 이름 변경
 - 미뤄둔 것들: 태그/업무 시스템 삭제 시 연결된 업무 처리, 404 정확히 만들기(`NoHandlerFoundException`), `LEARNING_NOTES.md` 커밋, 프로젝트·태그·시스템 목록 페이징(지금은 전체 반환), 저장소 이름 `work-log-backend`로 변경
 - [도구 참고] 이 세션의 Claude 브라우저는 작업 디렉터리가 백엔드라 `preview_start`의 `launch.json`이 프론트엔드를 못 띄움 → Bash `run_in_background`로 `npm run dev`를 띄우고 `navigate`로 접속하는 방식을 씀. 사용자가 따로 `npm run dev`를 켜 두면 5174로 밀려 CORS 에러가 나니 포트 겹침 먼저 확인.
